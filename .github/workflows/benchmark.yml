@@ -1,0 +1,62 @@
+name: Explorer memory benchmark
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '41 6 * * 1'
+permissions:
+  contents: read
+concurrency:
+  group: explorer-benchmark-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  benchmark:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run setup
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:cdp
+      - name: Compare 100,000-file explorers
+        env:
+          BENCHMARK_COMMIT: ${{ github.sha }}
+          BENCHMARK_RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: npm run benchmark
+      - run: npm run report
+      - run: npm run test:report
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: explorer-benchmark-${{ github.run_id }}
+          path: |
+            results/
+            .tmp/pages/
+          retention-days: 90
+      - uses: actions/upload-pages-artifact@v4
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        with:
+          path: .tmp/pages
+  deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: benchmark
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@v5
+      - uses: actions/deploy-pages@v4
+        id: deployment

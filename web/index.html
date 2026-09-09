@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Explorer benchmark fixture</title>
+<style>
+body { margin: 0; background: #181818; color: #ddd; font: 13px monospace; }
+#mount { width: 480px; height: 600px; position: relative; overflow: hidden; }
+.Explorer,.ListItems { height: 100%; overflow: hidden; }
+.TreeItem { display: flex; align-items: center; height: 22px; box-sizing: border-box; white-space: nowrap; }
+.Label { overflow: hidden; text-overflow: ellipsis; }
+.FileIcon { width: 14px; height: 14px; }
+.FileIconSlot { width: 16px; flex-shrink: 0; }
+.ScrollBar { position: absolute; right: 0; top: 0; width: 10px; }
+</style>
+<div id="mount"></div>
+<script type="module">
+const implementation = new URLSearchParams(location.search).get('implementation')
+if (!['lvce', 'pierre'].includes(implementation)) throw new Error('Choose implementation=lvce or implementation=pierre')
+window.benchmark = await (await import(`/${implementation}.js`)).mount(document.querySelector('#mount'))
+</script></html>
