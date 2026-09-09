@@ -96,6 +96,13 @@ The benchmark does not patch either component or increase Chromium's stack limit
 hide this result. The 10,000-file workload provides a smaller comparison alongside
 the original stress case. Consult the live report for results under the current protocol.
 
+The follow-up [restoration fix](https://github.com/lvce-editor/explorer-view/pull/1882)
+removes unbounded argument lists when appending directory entries. In the
+[validation run](https://github.com/levivilet/explorer-benchmark/actions/runs/34352237810),
+all five LVCE trials loaded 100,000 files, with about 11.18 MiB retained V8 heap
+versus 16.22 MiB for Pierre. The current source pin includes this fix; the initial
+failure above remains documented as historical evidence.
+
 ## Metrics and limits
 
 | Metric | Interpretation |
