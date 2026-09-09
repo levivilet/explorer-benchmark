@@ -1,0 +1,13 @@
+{
+  "lvce": {
+    "repository": "https://github.com/lvce-editor/explorer-view",
+    "commit": "6bc822f687696bdfc6cae9442d9f9391ebb0ee0f",
+    "url": "https://api.github.com/repos/lvce-editor/explorer-view/tarball/6bc822f687696bdfc6cae9442d9f9391ebb0ee0f",
+    "sha256": "e0023aa2160376cf672184ffc9edd258413ce30bf4c40e21e80ae4d17ee7c8be"
+  },
+  "pierre": {
+    "repository": "https://github.com/pierrecomputer/pierre",
+    "package": "@pierre/trees",
+    "version": "1.0.0-beta.6"
+  }
+}
