@@ -27,7 +27,7 @@ jobs:
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:cdp
-      - name: Compare 100,000-file explorers
+      - name: Compare 10,000- and 100,000-file explorers
         env:
           BENCHMARK_COMMIT: ${{ github.sha }}
           BENCHMARK_RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}

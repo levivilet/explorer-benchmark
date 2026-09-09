@@ -22,7 +22,12 @@ export async function mount(container) {
     worker.postMessage({ id, action, value })
   })
   const update = async (action, value) => {
-    const { dom, count, first, last } = await invoke(action, value)
+    const result = await invoke(action, value)
+    if (result.componentFailure) {
+      container.textContent = `Explorer failed to load: ${result.componentFailure.message}`
+      return result
+    }
+    const { dom, count, first, last } = result
     // Use LVCE's real DOM renderer; event dispatch belongs to this minimal host.
     renderInto(container, dom)
     return { count, first, last }

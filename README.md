@@ -6,8 +6,8 @@ and [Pierre's trees.software](https://trees.software), using real components in 
 [Live results](https://levivilet.github.io/explorer-benchmark/) ·
 [Run benchmark](https://github.com/levivilet/explorer-benchmark/actions/workflows/benchmark.yml)
 
-The default fixture is **100,000 empty files in one directory**. Both implementations
-load that directory listing, expose all 100,000 entries in their tree model, and
+The default workloads are **10,000 and 100,000 empty files, each in one directory**. Both implementations
+load that directory listing, expose all entries in their tree model, and
 render the first, middle and last files on demand. Their own virtualization remains
 enabled; we do not force 100,000 DOM elements. File names are `file-000000.txt` through
 `file-099999.txt`. The generated directory is `.tmp/fixtures/100000`.
@@ -23,7 +23,7 @@ npm run build                    # Production bundles for both components
 npx playwright install chromium  # Linux CI uses --with-deps
 npm test
 npm run test:cdp
-npm run benchmark                # 100,000 files; five fresh trials per component
+npm run benchmark                # 10k and 100k files; five fresh trials per component
 npm run report
 npm run test:report
 python3 -m http.server 8080 --directory .tmp/pages
@@ -37,7 +37,7 @@ Fixture generation checks for unexpected entries and fails rather than deleting 
 ```sh
 # Quick adapter/CDP smoke; explicitly labeled as too few trials for comparison:
 npm run benchmark -- --files 1000 --repeats 1 --samples 1 --output results-smoke
-node scripts/report.js results-smoke .tmp/smoke-pages
+node scripts/report-all.js results-smoke .tmp/smoke-pages
 
 # Open the components manually after generating/building:
 npm run fixture
@@ -47,7 +47,7 @@ npm run serve
 # In the console: await benchmark.load('loaded')
 ```
 
-Options: `--files` (1–1,000,000), `--repeats`, `--samples`, `--seed`, `--output`.
+Options: `--files` (comma-separated sizes, each 1–1,000,000), `--repeats`, `--samples`, `--seed`, `--output`.
 The 100,000-file case is the validated default, not a guarantee that either component
 supports the maximum accepted fixture size. Use different output directories when
 preserving runs. A fixture has zero-byte contents; the workload is directory metadata.
@@ -78,10 +78,23 @@ preserving runs. A fixture has zero-byte contents; the workload is directory met
 7. Take each trial's median across retained samples. Report median and min/max of those
    trial medians, and median of paired loaded-minus-empty differences. Negative differences
    remain negative. Fewer than three repeats are labeled smoke, not a comparison.
-8. Checkpoint every attempt, including failures. Any failed trial fails the command and
-   prevents a comparison/dashboard deployment. Failures are never zero-byte measurements.
+8. Checkpoint every attempt, including failures. An explicit component load error is a
+   benchmark outcome: show its message and failure count, with no aggregate memory number
+   for that component/size. Do not cherry-pick successful trials if some loads fail.
+   Harness/RPC/measurement errors, failed readiness probes, empty-tree initialization errors,
+   and incomplete runs still fail CI and block deployment. Failures are never zero-byte measurements.
    Close each browser in cleanup. Take screenshots after measurement so screenshot allocation
    does not affect that phase's samples.
+
+## Initial finding
+
+The [first 100,000-file CI run](https://github.com/levivilet/explorer-benchmark/actions/runs/34349230900)
+loaded Pierre successfully in all five trials (about 16.22 MiB retained V8 heap),
+but LVCE commit `6bc822f687696bdfc6cae9442d9f9391ebb0ee0f` reported
+`Maximum call stack size exceeded` in all five populated-workspace loads.
+The benchmark does not patch either component or increase Chromium's stack limit to
+hide this result. The 10,000-file workload provides a smaller comparison alongside
+the original stress case. Consult the live report for results under the current protocol.
 
 ## Metrics and limits
 
@@ -126,13 +139,13 @@ This benchmark is maintained by LVCE and does not predetermine the winner.
 ## CI and evidence
 
 Pull requests, main pushes, weekly schedules and manual dispatch run the full
-100,000-file / five-trial protocol on Ubuntu 24.04. Unit tests cover fixture integrity,
+10,000- and 100,000-file / five-trial protocol on Ubuntu 24.04. Unit tests cover fixture integrity,
 statistics and invalid-report rejection. A Chromium integration test verifies that
 worker allocations are included. Functional browser probes are part of every trial.
 The generated report is also checked in Chromium. Main publishes GitHub Pages only
-after all checks pass; PRs publish downloadable artifacts without deploying.
+after all harness checks pass; component load failures remain visible outcomes. PRs publish downloadable artifacts without deploying.
 
-Each run uploads raw JSON, all successful/failed screenshots and the standalone
+Each workload writes `results/<file-count>/results.json`. Each run uploads raw JSON, all successful/failed screenshots and the standalone
 HTML report as a 90-day artifact. Pages includes JSON and screenshot downloads.
 To update a source, change its exact version/commit and integrity pin together,
 regenerate the npm lock when appropriate, and review a fresh comparison.

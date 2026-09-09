@@ -3,7 +3,9 @@ import { RendererWorker, IconThemeWorker } from '@lvce-editor/rpc-registry'
 import { commandMap } from '../.tmp/vendor/packages/explorer-view/src/parts/CommandMap/CommandMap.ts'
 import { getComponentState } from '../.tmp/vendor/packages/explorer-view/src/parts/GetComponentState/GetComponentState.ts'
 let fixtureState = 'empty'
+let hostFailure
 RendererWorker.set({ invoke: async (method, ...args) => {
+  try {
   switch (method) {
     case 'Preferences.get': return args[0] === 'files.exclude' ? {} : false
     case 'Workspace.getUri': return '/workspace'
@@ -12,10 +14,11 @@ RendererWorker.set({ invoke: async (method, ...args) => {
       if (args[0] !== '/workspace') throw new Error(`Unexpected directory ${args[0]}`)
       const response = await fetch(`/entries?state=${fixtureState}`)
       if (!response.ok) throw new Error(`Directory read: ${response.status}`)
-      return response.json()
+      return await response.json()
     }
     default: throw new Error(`Unsupported host RPC: ${method}`)
   }
+  } catch (error) { hostFailure = error; throw error }
 }})
 IconThemeWorker.set({ invoke: async (method, requests) => {
   if (!method.endsWith('getIcons')) throw new Error(`Unsupported icon RPC: ${method}`)
@@ -33,7 +36,11 @@ self.onmessage = async ({ data: { id, action, value } }) => {
       await commandMap['Explorer.setDeltaY'](uid, value * state.itemHeight)
     } else throw new Error(`Unknown action ${action}`)
     const state = getComponentState(uid)
-    if (state.hasError) throw new Error(state.errorMessage)
+    if (hostFailure) throw hostFailure
+    if (state.hasError) {
+      self.postMessage({ id, value: { componentFailure: { message: state.errorMessage, code: state.errorCode, count: state.items.length } } })
+      return
+    }
     // Commit upstream rendering state so obsolete versions are not held artificially.
     await commandMap['Explorer.diff2'](uid)
     await commandMap['Explorer.render2'](uid)

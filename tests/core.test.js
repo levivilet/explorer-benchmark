@@ -47,3 +47,12 @@ test('report refuses failed, duplicate, or incomplete trials', () => {
   report.trials.pop()
   assert.throws(() => aggregate(report), /Incomplete/)
 })
+
+test('component load failures are shown without fabricated or cherry-picked memory', () => {
+  const report = { protocol: { repeats: 1 }, trials: ['lvce', 'pierre'].map((implementation) => ({ implementation, repeat: 0, status: 'unsupported', componentFailure: { message: 'Maximum call stack size exceeded' } })) }
+  const groups = aggregate(report)
+  assert.equal(groups.lvce.failures, 1)
+  assert.equal(groups.lvce.loaded, undefined)
+  delete report.trials[0].componentFailure
+  assert.throws(() => aggregate(report), /Missing component failure evidence/)
+})
