@@ -1,7 +1,6 @@
 # Explorer benchmark
 
-Reproducible memory comparison of [LVCE explorer-view](https://github.com/lvce-editor/explorer-view)
-, [Pierre's trees.software](https://trees.software), [React Arborist](https://github.com/brimdata/react-arborist),
+Reproducible memory comparison of [LVCE explorer-view](https://github.com/lvce-editor/explorer-view), [Pierre's trees.software](https://trees.software), [React Arborist](https://github.com/brimdata/react-arborist),
 [Headless Tree](https://github.com/lukasbach/headless-tree), and [jsTree](https://www.jstree.com/), using real components in Chromium.
 
 [Live results](https://levivilet.github.io/explorer-benchmark/) ·
