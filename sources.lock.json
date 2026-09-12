@@ -9,5 +9,20 @@
     "repository": "https://github.com/pierrecomputer/pierre",
     "package": "@pierre/trees",
     "version": "1.0.0-beta.6"
+  },
+  "arborist": {
+    "repository": "https://github.com/brimdata/react-arborist",
+    "package": "react-arborist",
+    "version": "3.16.0"
+  },
+  "headless": {
+    "repository": "https://github.com/lukasbach/headless-tree",
+    "package": "@headless-tree/core",
+    "version": "1.7.0"
+  },
+  "jstree": {
+    "repository": "https://github.com/vakata/jstree",
+    "package": "jstree",
+    "version": "3.3.17"
   }
 }

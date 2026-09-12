@@ -12,14 +12,14 @@
     "test": "node --test tests/*.test.js",
     "serve": "node scripts/server.js",
     "test:report": "node scripts/test-report.js",
-    "test:cdp": "node scripts/test-cdp.js"
+    "test:cdp": "node scripts/test-cdp.js",
+    "test:adapters": "node scripts/test-adapters.js"
   },
   "engines": {
     "node": ">=24"
   },
   "devDependencies": {
-    "@pierre/trees": "1.0.0-beta.6",
-    "@lvce-editor/virtual-dom": "11.19.0",
+    "@headless-tree/core": "1.7.0",
     "@lvce-editor/assert": "1.9.0",
     "@lvce-editor/constants": "5.30.0",
     "@lvce-editor/i18n": "2.10.0",
@@ -27,8 +27,15 @@
     "@lvce-editor/rpc-registry": "9.63.1",
     "@lvce-editor/verror": "1.7.0",
     "@lvce-editor/viewlet-registry": "5.12.0",
+    "@lvce-editor/virtual-dom": "11.19.0",
     "@lvce-editor/virtual-dom-worker": "11.19.0",
+    "@pierre/trees": "1.0.0-beta.6",
     "esbuild": "0.28.2",
-    "playwright": "1.63.0"
+    "jquery": "3.7.1",
+    "jstree": "3.3.17",
+    "playwright": "1.63.0",
+    "react": "19.2.8",
+    "react-arborist": "3.16.0",
+    "react-dom": "19.2.8"
   }
 }
