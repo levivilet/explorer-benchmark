@@ -19,7 +19,7 @@ export async function mount(container) {
     async scroll(index) {
       const node = ref.current.at(index)
       if (!node) throw new Error(`Missing Arborist item ${index}`)
-      ref.current.scrollTo(node.id, 'start')
+      flushSync(() => ref.current.scrollToOffset(index * 22))
     },
   }
 }

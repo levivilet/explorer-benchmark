@@ -23,6 +23,7 @@ npm run build                    # Production bundles for all five components
 npx playwright install chromium  # Linux CI uses --with-deps
 npm test
 npm run test:cdp
+npm run test:adapters              # Repeated virtualized scrolling regression
 npm run benchmark                # 10k and 100k files; five fresh trials per component
 npm run report
 npm run test:report
@@ -68,6 +69,9 @@ preserving runs. A fixture has zero-byte contents; the workload is directory met
    Each trial gets a fresh headless Chromium process and browser context, no extensions,
    800×720 viewport and device scale 1. The tree is 480×600 with 22-pixel rows.
 4. Mount an empty workspace and sample it. In the same trial load the populated workspace.
+   Allow up to five minutes per load for every component (recorded in the protocol);
+   jsTree's repeated sibling searches took about 144 seconds for 100k in a local diagnostic.
+   Scrolling actions and visibility probes retain the 90-second limit.
    Assert model counts and first/last names. Scroll via each component's API to the first,
    middle and last files; require the corresponding accessible tree rows to appear. Return
    to the start and sample. No traversal of all 100,000 visible DOM rows is required.

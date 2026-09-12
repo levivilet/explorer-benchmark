@@ -12,7 +12,8 @@
     "test": "node --test tests/*.test.js",
     "serve": "node scripts/server.js",
     "test:report": "node scripts/test-report.js",
-    "test:cdp": "node scripts/test-cdp.js"
+    "test:cdp": "node scripts/test-cdp.js",
+    "test:adapters": "node scripts/test-adapters.js"
   },
   "engines": {
     "node": ">=24"
