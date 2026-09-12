@@ -9,10 +9,14 @@ body { margin: 0; background: #181818; color: #ddd; font: 13px monospace; }
 .FileIcon { width: 14px; height: 14px; }
 .FileIconSlot { width: 16px; flex-shrink: 0; }
 .ScrollBar { position: absolute; right: 0; top: 0; width: 10px; }
+.jstree-container-ul,.jstree-children { list-style: none; margin: 0; padding: 0; }
+.jstree-node,.jstree-anchor { height: 22px; line-height: 22px; white-space: nowrap; }
+.jstree-anchor { display: inline-block; color: inherit; text-decoration: none; }
+.jstree-icon { display: none; }
 </style>
 <div id="mount"></div>
 <script type="module">
 const implementation = new URLSearchParams(location.search).get('implementation')
-if (!['lvce', 'pierre'].includes(implementation)) throw new Error('Choose implementation=lvce or implementation=pierre')
+if (!['lvce', 'pierre', 'arborist', 'headless', 'jstree'].includes(implementation)) throw new Error('Choose a supported implementation')
 window.benchmark = await (await import(`/${implementation}.js`)).mount(document.querySelector('#mount'))
 </script></html>

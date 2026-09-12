@@ -1,15 +1,16 @@
 # Explorer benchmark
 
 Reproducible memory comparison of [LVCE explorer-view](https://github.com/lvce-editor/explorer-view)
-and [Pierre's trees.software](https://trees.software), using real components in Chromium.
+, [Pierre's trees.software](https://trees.software), [React Arborist](https://github.com/brimdata/react-arborist),
+[Headless Tree](https://github.com/lukasbach/headless-tree), and [jsTree](https://www.jstree.com/), using real components in Chromium.
 
 [Live results](https://levivilet.github.io/explorer-benchmark/) ·
 [Run benchmark](https://github.com/levivilet/explorer-benchmark/actions/workflows/benchmark.yml)
 
-The default workloads are **10,000 and 100,000 empty files, each in one directory**. Both implementations
+The default workloads are **10,000 and 100,000 empty files, each in one directory**. All implementations
 load that directory listing, expose all entries in their tree model, and
-render the first, middle and last files on demand. Their own virtualization remains
-enabled; we do not force 100,000 DOM elements. File names are `file-000000.txt` through
+render the first, middle and last files on demand. Built-in virtualization remains enabled. The minimal Headless Tree DOM host and jsTree
+render all rows; no external virtualizer is added. DOM row counts expose this difference. File names are `file-000000.txt` through
 `file-099999.txt`. The generated directory is `.tmp/fixtures/100000`.
 
 ## Run
@@ -19,7 +20,7 @@ Node 24+, Linux/macOS/Windows with a working Chromium environment and `tar`:
 ```sh
 nice npm ci
 npm run setup                    # Download and verify pinned LVCE source
-npm run build                    # Production bundles for both components
+npm run build                    # Production bundles for all five components
 npx playwright install chromium  # Linux CI uses --with-deps
 npm test
 npm run test:cdp
@@ -44,11 +45,14 @@ npm run fixture
 npm run serve
 # http://127.0.0.1:4173/?implementation=lvce
 # http://127.0.0.1:4173/?implementation=pierre
+# http://127.0.0.1:4173/?implementation=arborist
+# http://127.0.0.1:4173/?implementation=headless
+# http://127.0.0.1:4173/?implementation=jstree
 # In the console: await benchmark.load('loaded')
 ```
 
 Options: `--files` (comma-separated sizes, each 1–1,000,000), `--repeats`, `--samples`, `--seed`, `--output`.
-The 100,000-file case is the validated default, not a guarantee that either component
+The 100,000-file case is the validated default, not a guarantee that each component
 supports the maximum accepted fixture size. Use different output directories when
 preserving runs. A fixture has zero-byte contents; the workload is directory metadata.
 
@@ -57,8 +61,8 @@ preserving runs. A fixture has zero-byte contents; the workload is directory met
 1. Generate actual files with bounded write concurrency. Hash the sorted, newline-separated
    file names (including the final newline), verify the count/types/names, and record the manifest.
    A common loopback server reads these files using `readdir`; it does not generate a synthetic
-   list in the browser. Both adapters receive the same sorted `{name, type}` listing.
-2. Pin the LVCE source commit and download checksum in `sources.lock.json`. Pin Pierre,
+   list in the browser. All adapters receive the same sorted `{name, type}` listing.
+2. Pin the LVCE source commit and download checksum in `sources.lock.json`. Pin all npm components,
    LVCE runtime dependencies, esbuild and Playwright in `package-lock.json`. Build production,
    minified bundles with the same bundler. Chromium is Playwright's matching revision.
 3. Shuffle all trials once with recorded seed 1729. Run one browser/component at a time.
@@ -92,7 +96,7 @@ The [first 100,000-file CI run](https://github.com/levivilet/explorer-benchmark/
 loaded Pierre successfully in all five trials (about 16.22 MiB retained V8 heap),
 but LVCE commit `6bc822f687696bdfc6cae9442d9f9391ebb0ee0f` reported
 `Maximum call stack size exceeded` in all five populated-workspace loads.
-The benchmark does not patch either component or increase Chromium's stack limit to
+The benchmark does not patch each component or increase Chromium's stack limit to
 hide this result. The 10,000-file workload provides a smaller comparison alongside
 the original stress case. Consult the live report for results under the current protocol.
 
@@ -132,11 +136,22 @@ isolates the tree and is intentionally a different scope from the desktop benchm
 
 Pierre uses the vanilla `FileTree` constructor and mounting API, including its
 ordinary path preparation (not precomputed/prepared input), internal state, shadow DOM,
-styles and built-in runtime. Neither adapter retains an extra fixture array for the
-observer after loading. File-type icon themes, search, Git integrations, and file
+styles and built-in runtime. No adapter retains an extra fixture array solely for the observer after loading. File-type icon themes, search, Git integrations, and file
 mutation features are disabled/unexercised. Component-specific overscan defaults are
 preserved and DOM row counts are reported. Empty baselines help expose differing
 fixed host costs, but subtraction cannot remove every integration difference.
+
+React Arborist uses its controlled React `Tree` with the built-in virtualizer and a minimal
+text node renderer. React and React DOM are included in its measured runtime. Headless Tree
+uses `@headless-tree/core`, its synchronous data loader, item model and accessibility props,
+with a minimal vanilla DOM host that renders every item. This is a specific nonvirtualized
+integration, not a claim about all Headless Tree integrations; external virtualizers can
+change its performance. jsTree uses its jQuery plugin, default worker parsing, and full DOM
+rendering with minimal 22-pixel layout CSS. jQuery is included in its measured runtime.
+All component and framework versions are pinned in the npm lockfile; source versions are
+listed in each report. New runs record their implementation inventory, while historical
+two-component reports remain readable. Every component gets the same five fresh trials
+at each default size, including first/middle/last DOM probes.
 
 A wide, flat directory is a stress case. Results do not generalize to deep trees,
 collapsed/lazy subdirectories, searches, mutations, file contents, or other sizes.

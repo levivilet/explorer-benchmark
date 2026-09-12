@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { median, shuffle } from '../scripts/statistics.js'
 import { createFixture, positiveInteger } from '../scripts/fixture.js'
-import { aggregate } from '../scripts/report.js'
+import { aggregate, renderChart } from '../scripts/report.js'
 import { startServer } from '../scripts/server.js'
 
 test('statistics keep negative deltas and reject missing measurements', () => {
@@ -55,4 +55,23 @@ test('component load failures are shown without fabricated or cherry-picked memo
   assert.equal(groups.lvce.loaded, undefined)
   delete report.trials[0].componentFailure
   assert.throws(() => aggregate(report), /Missing component failure evidence/)
+})
+
+
+test('five-component reports require every trial and fit every chart row', () => {
+  const implementations = ['lvce', 'pierre', 'arborist', 'headless', 'jstree']
+  const report = { protocol: { repeats: 1, implementations }, trials: implementations.map((implementation) => ({ implementation, repeat: 0, status: 'passed', deltaUsedSize: 2, phases: { empty: { usedSize: { median: 1 } }, loaded: { usedSize: { median: 3 } } } })) }
+  const groups = aggregate(report)
+  assert.deepEqual(Object.keys(groups), implementations)
+  const chart = renderChart(groups)
+  assert.match(chart, /viewBox="0 0 800 445"/)
+  assert.match(chart, /React Arborist/)
+  assert.match(chart, /Headless Tree/)
+  assert.match(chart, /jsTree/)
+  report.trials.pop()
+  assert.throws(() => aggregate(report), /Incomplete/)
+  report.protocol.implementations = ['lvce', 'lvce']
+  assert.throws(() => aggregate(report), /Invalid implementation inventory/)
+  report.protocol.implementations = ['unknown']
+  assert.throws(() => aggregate(report), /Invalid implementation inventory/)
 })

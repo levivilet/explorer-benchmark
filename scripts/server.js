@@ -18,7 +18,7 @@ export async function startServer(fixtureRoot, port = 0) {
         return
       }
       const name = url.pathname === '/' ? 'index.html' : url.pathname.slice(1)
-      if (!['index.html', 'file.svg', 'lvce.js', 'lvce-worker.js', 'pierre.js'].includes(name)) {
+      if (!['index.html', 'file.svg', 'lvce.js', 'lvce-worker.js', 'pierre.js', 'arborist.js', 'headless.js', 'jstree.js'].includes(name)) {
         response.writeHead(404).end(); return
       }
       response.setHeader('Content-Type', name.endsWith('.js') ? 'text/javascript' : name.endsWith('.svg') ? 'image/svg+xml' : 'text/html')
