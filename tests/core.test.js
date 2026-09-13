@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { median, shuffle } from '../scripts/statistics.js'
 import { createFixture, positiveInteger } from '../scripts/fixture.js'
-import { aggregate, renderChart } from '../scripts/report.js'
+import { aggregate, renderChart, renderTable } from '../scripts/report.js'
 import { startServer } from '../scripts/server.js'
 
 test('statistics keep negative deltas and reject missing measurements', () => {
@@ -74,4 +74,25 @@ test('five-component reports require every trial and fit every chart row', () =>
   assert.throws(() => aggregate(report), /Invalid implementation inventory/)
   report.protocol.implementations = ['unknown']
   assert.throws(() => aggregate(report), /Invalid implementation inventory/)
+})
+
+test('reports sort successful comparisons by loaded heap and keep failures last', () => {
+  const inventory = ['lvce', 'pierre', 'arborist', 'headless', 'jstree']
+  const loaded = { lvce: 30, pierre: 10, arborist: 20, jstree: 10 }
+  const makeReport = (measurements) => {
+    const makeTrial = (implementation) => measurements[implementation] === undefined
+      ? { implementation, repeat: 0, status: 'unsupported', componentFailure: { message: 'Load failed' } }
+      : { implementation, repeat: 0, status: 'passed', deltaUsedSize: 2, phases: { empty: { usedSize: { median: 1 } }, loaded: { usedSize: { median: measurements[implementation] } } } }
+    return { protocol: { repeats: 1, implementations: inventory }, trials: inventory.map(makeTrial) }
+  }
+  const report = makeReport(loaded)
+  const groups = aggregate(report)
+  const expectedOrder = ['pierre', 'jstree', 'arborist', 'lvce', 'headless']
+  assert.deepEqual(Object.keys(groups), expectedOrder)
+  const orderIn = (markup) => expectedOrder.map((implementation) => markup.indexOf({ lvce: 'LVCE explorer-view', pierre: 'Pierre / trees.software', arborist: 'React Arborist', headless: 'Headless Tree (DOM host)', jstree: 'jsTree' }[implementation]))
+  assert.deepEqual(orderIn(renderChart(groups)).every((position, index, positions) => index === 0 || position > positions[index - 1]), true)
+  assert.deepEqual(orderIn(renderTable(groups)).every((position, index, positions) => index === 0 || position > positions[index - 1]), true)
+  assert.match(renderChart(groups), /<rect[^>]+fill="#4db9aa"/)
+  assert.match(renderChart(groups), /Load failed \(1\/1\) — no memory result/)
+  assert.deepEqual(Object.keys(aggregate(makeReport({ lvce: 300, pierre: 200, arborist: 100, headless: 400, jstree: 50 }))), ['jstree', 'arborist', 'pierre', 'lvce', 'headless'])
 })

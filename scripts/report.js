@@ -23,23 +23,36 @@ export function aggregate(report) {
     }
     groups[implementation] = group
   }
-  return groups
+  return sortGroups(groups)
+}
+export function sortGroups(groups) {
+  const entries = Object.entries(groups).map(([key, group], index) => ({ key, group, index }))
+  entries.sort((left, right) => {
+    const leftHasResult = Boolean(left.group.loaded)
+    const rightHasResult = Boolean(right.group.loaded)
+    if (leftHasResult !== rightHasResult) return leftHasResult ? -1 : 1
+    if (!leftHasResult) return left.index - right.index
+    return left.group.loaded.median - right.group.loaded.median || left.index - right.index
+  })
+  return Object.fromEntries(entries.map(({ key, group }) => [key, group]))
 }
 export const escape = (text) => String(text).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char])
 export const mib = (bytes) => (bytes / 1048576).toFixed(2)
 export const style = `body{margin:0;background:#15191e;color:#ecf0f4;font:16px/1.6 system-ui}main{max-width:1000px;margin:60px auto;padding:0 24px}h1{font-size:42px;line-height:1.15}h2{margin-top:40px}a{color:#73d2c5}p{max-width:850px}table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}td,th{text-align:left;padding:12px;border-bottom:1px solid #39434d}svg{width:100%;max-width:850px}small{color:#b0bac4}.scroll{overflow-x:auto}.badge{color:#73d2c5;text-transform:uppercase;letter-spacing:2px}code{overflow-wrap:anywhere}.failure{color:#ffbe85}`
 export function renderChart(groups) {
-  const max = Math.max(1, ...Object.values(groups).filter((group) => group.loaded).map((group) => group.loaded.max))
-  return `<svg viewBox="0 0 800 ${Object.keys(groups).length * 85 + 20}" role="img" aria-label="Retained JavaScript heap medians and ranges in MiB; failed loads have no bar"><title>Loaded tree retained JavaScript heap; lower uses less</title>${Object.entries(groups).map(([key, group], i) => {
+  const orderedGroups = sortGroups(groups)
+  const max = Math.max(1, ...Object.values(orderedGroups).filter((group) => group.loaded).map((group) => group.loaded.max))
+  return `<svg viewBox="0 0 800 ${Object.keys(orderedGroups).length * 85 + 20}" role="img" aria-label="Retained JavaScript heap medians and ranges in MiB; failed loads have no bar"><title>Loaded tree retained JavaScript heap; lower uses less</title>${Object.entries(orderedGroups).map(([key, group], i) => {
     const y = 35 + i * 85
     const label = `<text x="0" y="${y + 22}" fill="currentColor" font-size="14">${labels[key]}</text>`
     if (group.failures) return `${label}<text x="235" y="${y + 22}" fill="#ffbe85">Load failed (${group.failures}/${group.repeats}) — no memory result</text>`
     const x = (value) => 235 + value / max * 430
-    return `${label}<rect x="235" y="${y}" width="${x(group.loaded.median) - 235}" height="32" rx="3" fill="${i ? '#c982de' : '#4db9aa'}"/><path d="M${x(group.loaded.min)},${y + 16}H${x(group.loaded.max)}" stroke="white" stroke-width="3"/><text x="${x(group.loaded.median) + 12}" y="${y + 53}" fill="currentColor">${mib(group.loaded.median)} MiB</text>`
+    const fill = key === 'lvce' ? '#4db9aa' : '#c982de'
+    return `${label}<rect x="235" y="${y}" width="${x(group.loaded.median) - 235}" height="32" rx="3" fill="${fill}"/><path d="M${x(group.loaded.min)},${y + 16}H${x(group.loaded.max)}" stroke="white" stroke-width="3"/><text x="${x(group.loaded.median) + 12}" y="${y + 53}" fill="currentColor">${mib(group.loaded.median)} MiB</text>`
   }).join('')}</svg>`
 }
 export function renderTable(groups) {
-  const rows = Object.entries(groups).map(([key, group]) => group.failures
+  const rows = Object.entries(sortGroups(groups)).map(([key, group]) => group.failures
     ? `<tr><th>${labels[key]}</th><td colspan="4" class="failure">${group.failures}/${group.repeats} loads failed: ${group.messages.map(escape).join('; ')}</td></tr>`
     : `<tr><th>${labels[key]}</th><td>${mib(group.empty.median)}</td><td>${mib(group.loaded.median)}</td><td>${mib(group.loaded.min)}–${mib(group.loaded.max)}</td><td>${mib(group.delta.median)}</td></tr>`).join('')
   return `<div class="scroll"><table><caption>MiB (1,048,576 bytes). Medians across independent trials; range of trial medians.</caption><thead><tr><th>Implementation</th><th>Empty</th><th>Loaded</th><th>Loaded range</th><th>Paired increase</th></tr></thead><tbody>${rows}</tbody></table></div>`
