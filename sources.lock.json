@@ -1,9 +1,9 @@
 {
   "lvce": {
     "repository": "https://github.com/lvce-editor/explorer-view",
-    "commit": "dbfa906c631c2d4374a398b3270dbf0220aed40e",
-    "url": "https://api.github.com/repos/lvce-editor/explorer-view/tarball/dbfa906c631c2d4374a398b3270dbf0220aed40e",
-    "sha256": "e97b6b623ff275ed35847d7de64f1d23dff386982da69c6ddd16db14af86b88f"
+    "commit": "54bba0a7c70986c4ae171d1aec0a3911aeb593f3",
+    "url": "https://api.github.com/repos/lvce-editor/explorer-view/tarball/54bba0a7c70986c4ae171d1aec0a3911aeb593f3",
+    "sha256": "bee502cd6e6b3a42365846bed5afe4d66c32c22a7f14062d26ee7a144a9b0d30"
   },
   "pierre": {
     "repository": "https://github.com/pierrecomputer/pierre",
