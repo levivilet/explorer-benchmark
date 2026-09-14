@@ -7,6 +7,9 @@ import { createFixture, FixtureCapacityError, positiveInteger } from './fixture.
 import { startServer } from './server.js'
 import { runTrial } from './trial.js'
 import { shuffle } from './statistics.js'
+import { exitOnTermination } from './termination.js'
+
+exitOnTermination()
 
 const { values } = parseArgs({ options: {
   files: { type: 'string', default: '100000' }, repeats: { type: 'string', default: '5' },

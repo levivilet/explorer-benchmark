@@ -10,7 +10,7 @@
     "benchmark": "node scripts/run.js",
     "report": "node scripts/report-all.js",
     "test": "node --test tests/core.test.js tests/merge.test.js",
-    "test:crash": "node --test tests/crash.test.js",
+    "test:crash": "node --test tests/crash.test.js tests/termination.test.js",
     "merge": "node scripts/merge.js",
     "serve": "node scripts/server.js",
     "test:report": "node scripts/test-report.js",

@@ -70,7 +70,7 @@ workload is directory metadata.
 2. Pin the LVCE source commit and download checksum in `sources.lock.json`. Pin all npm components,
    LVCE runtime dependencies, esbuild and Playwright in `package-lock.json`. Build production,
    minified bundles with the same bundler. Chromium is Playwright's matching revision.
-3. Shuffle all trials once with recorded seed 1729. Run one browser/component at a time.
+3. Shuffle trials once per job with recorded seed 1729. Run one browser/component at a time within each job.
    Each trial gets a fresh headless Chromium process and browser context, no extensions,
    800×720 viewport and device scale 1. The tree is 480×600 with 22-pixel rows.
 4. Mount an empty workspace and sample it. In the same trial load the populated workspace.
