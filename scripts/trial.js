@@ -11,7 +11,6 @@ export async function runTrial(trialInfo, { report, manifest, server, output, la
   const trial = { ...trialInfo, status: 'failed', phases: {} }
   let browser
   let page
-  let rootSession
   let phase
   let targetFailure
   const errors = []
@@ -42,7 +41,7 @@ export async function runTrial(trialInfo, { report, manifest, server, output, la
     page = await browser.newPage({ viewport: report.protocol.viewport, deviceScaleFactor: 1 })
     page.on('crash', () => onTargetFailure('target-crash', 'Chromium target crashed during the workload'))
     page.on('close', () => onTargetFailure('target-closed', 'Chromium target closed during the workload'))
-    rootSession = await browser.newBrowserCDPSession()
+    const rootSession = await browser.newBrowserCDPSession()
     rootSession.on('Target.targetCrashed', ({ status, errorCode }) => onTargetFailure('target-crash', `Chromium target crashed (${status}, code ${errorCode})`))
     await rootSession.send('Target.setDiscoverTargets', { discover: true })
     page.setDefaultTimeout(90000)
@@ -125,7 +124,7 @@ export async function runTrial(trialInfo, { report, manifest, server, output, la
   } finally {
     trial.consoleErrors = errors
     if (trial.status !== 'passed') await screenshot('failed')
-    await rootSession?.detach().catch(() => {})
+    // Closing our browser disposes its sessions. Detach can hang during disconnection.
     await browser?.close().catch((error) => { trial.cleanupError = error.message })
   }
   if (trial.status === 'unsupported') console.log(`${trial.implementation} #${trial.repeat + 1}: UNSUPPORTED: ${trial.componentFailure.message}`)
