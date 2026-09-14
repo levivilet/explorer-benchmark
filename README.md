@@ -55,7 +55,8 @@ npm run serve
 Options: `--files` (comma-separated sizes, each 1–10,000,000), `--repeats`, `--samples`, `--seed`, `--output`.
 The 100,000- and 1,000,000-file cases are required measurements, not guarantees that each
 component supports those sizes. The 10,000,000-file case records and publishes
-a filesystem feasibility result when the host cannot allocate its required inodes. Use
+a filesystem feasibility result when the host cannot allocate its required inodes or the
+bounded 15-minute attempt cannot complete. Use
 different output directories when preserving runs. A fixture has zero-byte contents; the
 workload is directory metadata.
 

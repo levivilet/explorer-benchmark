@@ -7,16 +7,16 @@ if (manifest.status !== 'complete') throw new Error('Benchmark matrix incomplete
 if (manifest.workloads && (!Array.isArray(manifest.workloads) || manifest.workloads.length !== manifest.files.length || manifest.workloads.some(({ count, status }) => !manifest.files.includes(count) || !['complete', 'infeasible'].includes(status)))) throw new Error('Benchmark workload inventory incomplete or invalid')
 const runs = []
 for (const count of manifest.files) {
-  try {
-    runs.push({ kind: 'benchmark', ...(await buildReport(`${source}/${count}`, `${destination}/${count}`)) })
-  } catch (error) {
-    if (error.code !== 'ENOENT') throw error
-    const feasibility = JSON.parse(await readFile(`${source}/${count}/feasibility.json`, 'utf8'))
+  let feasibility
+  try { feasibility = JSON.parse(await readFile(`${source}/${count}/feasibility.json`, 'utf8')) } catch (error) { if (error.code !== 'ENOENT') throw error }
+  if (feasibility) {
     if (feasibility.status !== 'infeasible') throw new Error(`Invalid feasibility result for ${count}`)
     await mkdir(`${destination}/${count}/evidence`, { recursive: true })
-    await cp(`${source}/${count}/feasibility.json`, `${destination}/${count}/evidence/feasibility.json`)
+    await cp(`${source}/${count}`, `${destination}/${count}/evidence`, { recursive: true })
     await writeFile(`${destination}/${count}/index.html`, `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Explorer memory benchmark</title><style>${style}</style><main><h1>Explorer memory benchmark</h1><h2>${count.toLocaleString('en-US')} files</h2>${renderFeasibility(feasibility)}<p><a href="evidence/feasibility.json" download>Download feasibility evidence (JSON)</a></p></main></html>`)
     runs.push({ kind: 'feasibility', feasibility })
+  } else {
+    runs.push({ kind: 'benchmark', ...(await buildReport(`${source}/${count}`, `${destination}/${count}`)) })
   }
 }
 const sections = runs.map((run) => run.kind === 'feasibility'

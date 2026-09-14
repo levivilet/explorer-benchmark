@@ -83,7 +83,17 @@ try {
       await page.waitForFunction(() => Boolean(window.benchmark))
       for (const phase of ['empty', 'loaded']) {
         const start = performance.now()
-        const state = await evaluate((phase) => window.benchmark.load(phase), phase, report.protocol.loadTimeoutMs)
+        let state
+        try {
+          state = await evaluate((phase) => window.benchmark.load(phase), phase, report.protocol.loadTimeoutMs)
+        } catch (error) {
+          if (phase !== 'loaded' || !error.message.startsWith('Component action timed out')) throw error
+          trial.status = 'unsupported'
+          trial.componentFailure = { message: error.message, type: 'load-timeout' }
+          await page.screenshot({ path: `${output}/${trial.implementation}-${trial.repeat}-failed.png` })
+          console.log(`${trial.implementation} #${trial.repeat + 1}: LOAD FAILED: ${error.message}`)
+          break
+        }
         if (state.componentFailure) {
           assert.equal(phase, 'loaded', 'Empty component must initialize successfully')
           // An explicit upstream load error is a benchmark outcome, never a memory value.

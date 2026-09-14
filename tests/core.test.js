@@ -64,7 +64,7 @@ test('component load failures are shown without fabricated or cherry-picked memo
 test('fixture feasibility evidence is rendered as a non-measurement', () => {
   const html = renderFeasibility({ files: 10000000, reason: 'Not enough filesystem inodes', details: { availableInodes: '2', requiredInodes: '10000000' } })
   assert.match(html, /10,000,000-file workload was infeasible/)
-  assert.match(html, /No component measurement was attempted/)
+  assert.match(html, /No complete component comparison was published/)
 })
 
 
