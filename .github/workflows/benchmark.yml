@@ -12,9 +12,9 @@ concurrency:
   group: explorer-benchmark-${{ github.ref }}
   cancel-in-progress: false
 jobs:
-  benchmark:
+  test:
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -28,12 +28,56 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run test:cdp
       - run: npm run test:adapters
-      - name: Compare 10,000- and 100,000-file explorers
+      - run: npm run test:crash
+  benchmark:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        implementation: [lvce, pierre, arborist, headless, jstree]
+        files: [10000, 100000, 1000000, 10000000]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run setup
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - name: Benchmark ${{ matrix.implementation }} with ${{ matrix.files }} files
         env:
           BENCHMARK_COMMIT: ${{ github.sha }}
           BENCHMARK_RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: npm run benchmark
+        run: npm run benchmark -- --implementation ${{ matrix.implementation }} --files ${{ matrix.files }}
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: explorer-shard-${{ matrix.implementation }}-${{ matrix.files }}
+          path: results/
+          if-no-files-found: error
+          retention-days: 90
+  report:
+    needs: [test, benchmark]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v5
+        with:
+          pattern: explorer-shard-*
+          path: shards
+      - run: npm run merge
       - run: npm run report
+      - run: npx playwright install --with-deps chromium
       - run: npm run test:report
       - uses: actions/upload-artifact@v5
         if: always()
@@ -42,14 +86,18 @@ jobs:
           path: |
             results/
             .tmp/pages/
+          include-hidden-files: true
           retention-days: 90
+      - name: Require all validation and benchmark jobs
+        if: needs.test.result != 'success' || needs.benchmark.result != 'success'
+        run: exit 1
       - uses: actions/upload-pages-artifact@v4
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         with:
           path: .tmp/pages
   deploy:
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    needs: benchmark
+    needs: report
     runs-on: ubuntu-24.04
     permissions:
       pages: write

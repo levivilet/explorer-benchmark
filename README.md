@@ -6,11 +6,12 @@ Reproducible memory comparison of [LVCE explorer-view](https://github.com/lvce-e
 [Live results](https://levivilet.github.io/explorer-benchmark/) ·
 [Run benchmark](https://github.com/levivilet/explorer-benchmark/actions/workflows/benchmark.yml)
 
-The default workloads are **10,000 and 100,000 empty files, each in one directory**. All implementations
+The default workloads are **10,000, 100,000, 1,000,000 and 10,000,000 empty files, each in one directory**. All implementations
 load that directory listing, expose all entries in their tree model, and
 render the first, middle and last files on demand. Built-in virtualization remains enabled. The minimal Headless Tree DOM host and jsTree
-render all rows; no external virtualizer is added. DOM row counts expose this difference. File names are `file-000000.txt` through
-`file-099999.txt`. The generated directory is `.tmp/fixtures/100000`.
+render all rows; no external virtualizer is added. DOM row counts expose this difference. Names are zero-padded to a width that keeps
+lexicographic and numeric order identical (`file-000000.txt` through `file-099999.txt` for 100,000 files). Generated directories are
+`.tmp/fixtures/10000`, `.tmp/fixtures/100000`, `.tmp/fixtures/1000000` and `.tmp/fixtures/10000000`.
 
 ## Run
 
@@ -24,7 +25,8 @@ npx playwright install chromium  # Linux CI uses --with-deps
 npm test
 npm run test:cdp
 npm run test:adapters              # Repeated virtualized scrolling regression
-npm run benchmark                # 10k and 100k files; five fresh trials per component
+npm run test:crash                 # Actual Chromium crash and recovery regression
+npm run benchmark                # 10k, 100k, 1m and 10m files; five fresh trials per component
 npm run report
 npm run test:report
 python3 -m http.server 8080 --directory .tmp/pages
@@ -51,10 +53,13 @@ npm run serve
 # In the console: await benchmark.load('loaded')
 ```
 
-Options: `--files` (comma-separated sizes, each 1–1,000,000), `--repeats`, `--samples`, `--seed`, `--output`.
-The 100,000-file case is the validated default, not a guarantee that each component
-supports the maximum accepted fixture size. Use different output directories when
-preserving runs. A fixture has zero-byte contents; the workload is directory metadata.
+Options: `--files` (comma-separated sizes, each 1–10,000,000), `--repeats`, `--samples`, `--seed`, `--output`, and `--implementation` (one of `lvce`, `pierre`, `arborist`, `headless`, `jstree`; defaults to all).
+The 100,000- and 1,000,000-file cases are required measurements, not guarantees that each
+component supports those sizes. The 10,000,000-file case records and publishes
+a filesystem feasibility result when the host cannot allocate its required inodes or the
+bounded 15-minute attempt cannot complete. Use
+different output directories when preserving runs. A fixture has zero-byte contents; the
+workload is directory metadata.
 
 ## Protocol
 
@@ -65,7 +70,7 @@ preserving runs. A fixture has zero-byte contents; the workload is directory met
 2. Pin the LVCE source commit and download checksum in `sources.lock.json`. Pin all npm components,
    LVCE runtime dependencies, esbuild and Playwright in `package-lock.json`. Build production,
    minified bundles with the same bundler. Chromium is Playwright's matching revision.
-3. Shuffle all trials once with recorded seed 1729. Run one browser/component at a time.
+3. Shuffle trials once per job with recorded seed 1729. Run one browser/component at a time within each job.
    Each trial gets a fresh headless Chromium process and browser context, no extensions,
    800×720 viewport and device scale 1. The tree is 480×600 with 22-pixel rows.
 4. Mount an empty workspace and sample it. In the same trial load the populated workspace.
@@ -74,7 +79,9 @@ preserving runs. A fixture has zero-byte contents; the workload is directory met
    Scrolling actions and visibility probes retain the 90-second limit.
    Assert model counts and first/last names. Scroll via each component's API to the first,
    middle and last files; require the corresponding accessible tree rows to appear. Return
-   to the start and sample. No traversal of all 100,000 visible DOM rows is required.
+   to the start and sample. No traversal of all millions of visible DOM rows is required.
+   For filenames wider than six digits, the fixture uses a wider common zero-padding width
+   so directory sorting remains numeric.
 5. After readiness, settle for one second. Record one natural (no forced GC) sample.
    Then record three retained samples 250 ms apart, forcing `HeapProfiler.collectGarbage`
    in every distinct V8 isolate before `Runtime.getHeapUsage`.
@@ -85,12 +92,14 @@ preserving runs. A fixture has zero-byte contents; the workload is directory met
 7. Take each trial's median across retained samples. Report median and min/max of those
    trial medians, and median of paired loaded-minus-empty differences. Negative differences
    remain negative. Fewer than three repeats are labeled smoke, not a comparison.
-8. Checkpoint every attempt, including failures. An explicit component load error is a
+8. Checkpoint every attempt, including failures. An explicit component load error, a loaded-tree timeout,
+   or a Chromium target crash/disconnection after a successful empty baseline is a
    benchmark outcome: show its message and failure count, with no aggregate memory number
    for that component/size. Do not cherry-pick successful trials if some loads fail.
    Harness/RPC/measurement errors, failed readiness probes, empty-tree initialization errors,
    and incomplete runs still fail CI and block deployment. Failures are never zero-byte measurements.
-   Close each browser in cleanup. Take screenshots after measurement so screenshot allocation
+   Record crash details and console errors without attempting to invent a memory value.
+   Screenshots are best effort; crashed targets may have none. Close each browser in cleanup. Take screenshots after measurement so screenshot allocation
    does not affect that phase's samples.
 
 ## Initial finding
@@ -164,13 +173,28 @@ This benchmark is maintained by LVCE and does not predetermine the winner.
 ## CI and evidence
 
 Pull requests, main pushes, weekly schedules and manual dispatch run the full
-10,000- and 100,000-file / five-trial protocol on Ubuntu 24.04. Unit tests cover fixture integrity,
+10,000-, 100,000-, 1,000,000- and 10,000,000-file / five-trial protocol on Ubuntu 24.04. Each implementation/file-count pair runs in its own job (20 parallel jobs, subject to runner availability),
+with fail-fast disabled. A final job downloads all shards, validates their complete trial inventory,
+source/fixture/dependency pins and protocol, then merges measurements and builds the report.
+Host metadata and original JSON remain available per job; trial order is randomized within each job,
+not globally across implementations. Missing jobs and harness failures still block publication.
+A 10M job that cannot run records host feasibility evidence without discarding other trees
+that completed that size. Unit tests cover fixture integrity,
 statistics and invalid-report rejection. A Chromium integration test verifies that
 worker allocations are included. Functional browser probes are part of every trial.
 The generated report is also checked in Chromium. Main publishes GitHub Pages only
 after all harness checks pass; component load failures remain visible outcomes. PRs publish downloadable artifacts without deploying.
 
-Each workload writes `results/<file-count>/results.json`. Each run uploads raw JSON, all successful/failed screenshots and the standalone
+Each workload writes `results/<file-count>/results.json`. To run an individual shard:
+
+```sh
+npm run benchmark -- --implementation lvce --files 100000 --output shards/lvce-100000
+# After collecting all 20 shards under shards/:
+npm run merge
+npm run report
+```
+
+The merge requires all five implementations at all four default sizes. Each run uploads raw JSON, all successful/failed screenshots and the standalone
 HTML report as a 90-day artifact. Pages includes JSON and screenshot downloads.
 To update a source, change its exact version/commit and integrity pin together,
 regenerate the npm lock when appropriate, and review a fresh comparison.

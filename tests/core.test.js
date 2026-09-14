@@ -4,8 +4,8 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { median, shuffle } from '../scripts/statistics.js'
-import { createFixture, positiveInteger } from '../scripts/fixture.js'
-import { aggregate, renderChart, renderTable } from '../scripts/report.js'
+import { createFixture, fileName, fileNameWidth, positiveInteger } from '../scripts/fixture.js'
+import { aggregate, renderChart, renderFeasibility, renderTable } from '../scripts/report.js'
 import { startServer } from '../scripts/server.js'
 
 test('statistics keep negative deltas and reject missing measurements', () => {
@@ -15,6 +15,10 @@ test('statistics keep negative deltas and reject missing measurements', () => {
   assert.throws(() => median([1, NaN]))
   assert.throws(() => positiveInteger('0', 'files'))
   assert.throws(() => positiveInteger('2.5', 'files'))
+  assert.equal(fileNameWidth(100000), 6)
+  assert.equal(fileNameWidth(1000001), 7)
+  assert.equal(fileName(999999, 7), 'file-0999999.txt')
+  assert(fileName(999999, 7) < fileName(1000000, 7))
   assert.deepEqual(shuffle([1, 2, 3, 4], 1729), shuffle([1, 2, 3, 4], 1729))
   assert.deepEqual(shuffle([1, 2, 3, 4], 1729).sort(), [1, 2, 3, 4])
 })
@@ -57,6 +61,12 @@ test('component load failures are shown without fabricated or cherry-picked memo
   assert.throws(() => aggregate(report), /Missing component failure evidence/)
 })
 
+test('fixture feasibility evidence is rendered as a non-measurement', () => {
+  const html = renderFeasibility({ files: 10000000, reason: 'Not enough filesystem inodes', details: { availableInodes: '2', requiredInodes: '10000000' } })
+  assert.match(html, /10,000,000-file workload was infeasible/)
+  assert.match(html, /No complete component comparison was published/)
+})
+
 
 test('five-component reports require every trial and fit every chart row', () => {
   const implementations = ['lvce', 'pierre', 'arborist', 'headless', 'jstree']
@@ -93,6 +103,6 @@ test('reports sort successful comparisons by loaded heap and keep failures last'
   assert.deepEqual(orderIn(renderChart(groups)).every((position, index, positions) => index === 0 || position > positions[index - 1]), true)
   assert.deepEqual(orderIn(renderTable(groups)).every((position, index, positions) => index === 0 || position > positions[index - 1]), true)
   assert.match(renderChart(groups), /<rect[^>]+fill="#4db9aa"/)
-  assert.match(renderChart(groups), /Load failed \(1\/1\) — no memory result/)
+  assert.match(renderChart(groups), /Not supported \(1\/1\) — no memory result/)
   assert.deepEqual(Object.keys(aggregate(makeReport({ lvce: 300, pierre: 200, arborist: 100, headless: 400, jstree: 50 }))), ['jstree', 'arborist', 'pierre', 'lvce', 'headless'])
 })
