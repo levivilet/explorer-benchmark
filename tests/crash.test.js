@@ -9,7 +9,7 @@ import { runTrial } from '../scripts/trial.js'
 async function attempt(output, scenario, repeat = 0) {
   return runTrial({ implementation: 'pierre', repeat }, {
     output, manifest: { count: 1 },
-    report: { protocol: { viewport: { width: 800, height: 720 }, samples: 1, loadTimeoutMs: 1000, settleMs: 0, sampleIntervalMs: 0 } },
+    report: { protocol: { viewport: { width: 800, height: 720 }, samples: 1, loadTimeoutMs: 10000, settleMs: 0, sampleIntervalMs: 0 } },
     server: { url: 'http://benchmark.test' },
     launchBrowser: async () => {
       const browser = await chromium.launch()
@@ -28,8 +28,10 @@ async function attempt(output, scenario, repeat = 0) {
           if (argument === (scenario === 'empty crash' ? 'empty' : 'loaded')) {
             if (scenario === 'crash' || scenario === 'empty crash') {
               const session = await page.context().newCDPSession(page)
+              const crashed = page.waitForEvent('crash', { timeout: 10000 })
               void session.send('Page.crash').catch(() => {})
-              return evaluate(() => new Promise(() => {}))
+              await crashed
+              return evaluate(fn, argument)
             }
             if (scenario === 'disconnect') { await browser.close(); return evaluate(fn, argument) }
             if (scenario === 'rpc error') throw new Error('Broken benchmark RPC')

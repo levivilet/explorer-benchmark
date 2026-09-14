@@ -1,6 +1,6 @@
 import { implementations, labels } from './implementations.js'
 export { labels } from './implementations.js'
-import { mkdir, readFile, writeFile, cp } from 'node:fs/promises'
+import { access, mkdir, readFile, writeFile, cp } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
 import { summary } from './statistics.js'
 export function aggregate(report) {
@@ -71,6 +71,16 @@ export function renderTable(groups) {
 export async function buildReport(source = 'results', destination = '.tmp/pages') {
   const report = JSON.parse(await readFile(`${source}/results.json`, 'utf8'))
   const groups = aggregate(report)
+  // Older reports used implicit screenshot names. Keep their existing downloads.
+  for (const trial of report.trials) {
+    if (trial.screenshots) continue
+    const phase = trial.status === 'passed' ? 'loaded' : 'failed'
+    const name = `${trial.implementation}-${trial.repeat}-${phase}.png`
+    try {
+      await access(`${source}/${name}`)
+      trial.screenshots = { [phase]: name }
+    } catch (error) { if (error.code !== 'ENOENT') throw error }
+  }
   await mkdir(destination, { recursive: true })
   await cp(source, `${destination}/evidence`, { recursive: true })
   const html = `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Explorer memory benchmark</title><style>${style}</style>
