@@ -6,11 +6,12 @@ Reproducible memory comparison of [LVCE explorer-view](https://github.com/lvce-e
 [Live results](https://levivilet.github.io/explorer-benchmark/) ·
 [Run benchmark](https://github.com/levivilet/explorer-benchmark/actions/workflows/benchmark.yml)
 
-The default workloads are **10,000 and 100,000 empty files, each in one directory**. All implementations
+The default workloads are **10,000, 100,000, 1,000,000 and 10,000,000 empty files, each in one directory**. All implementations
 load that directory listing, expose all entries in their tree model, and
 render the first, middle and last files on demand. Built-in virtualization remains enabled. The minimal Headless Tree DOM host and jsTree
-render all rows; no external virtualizer is added. DOM row counts expose this difference. File names are `file-000000.txt` through
-`file-099999.txt`. The generated directory is `.tmp/fixtures/100000`.
+render all rows; no external virtualizer is added. DOM row counts expose this difference. Names are zero-padded to a width that keeps
+lexicographic and numeric order identical (`file-000000.txt` through `file-099999.txt` for 100,000 files). Generated directories are
+`.tmp/fixtures/10000`, `.tmp/fixtures/100000`, `.tmp/fixtures/1000000` and `.tmp/fixtures/10000000`.
 
 ## Run
 
@@ -24,7 +25,7 @@ npx playwright install chromium  # Linux CI uses --with-deps
 npm test
 npm run test:cdp
 npm run test:adapters              # Repeated virtualized scrolling regression
-npm run benchmark                # 10k and 100k files; five fresh trials per component
+npm run benchmark                # 10k, 100k, 1m and 10m files; five fresh trials per component
 npm run report
 npm run test:report
 python3 -m http.server 8080 --directory .tmp/pages
@@ -51,10 +52,12 @@ npm run serve
 # In the console: await benchmark.load('loaded')
 ```
 
-Options: `--files` (comma-separated sizes, each 1–1,000,000), `--repeats`, `--samples`, `--seed`, `--output`.
-The 100,000-file case is the validated default, not a guarantee that each component
-supports the maximum accepted fixture size. Use different output directories when
-preserving runs. A fixture has zero-byte contents; the workload is directory metadata.
+Options: `--files` (comma-separated sizes, each 1–10,000,000), `--repeats`, `--samples`, `--seed`, `--output`.
+The 100,000- and 1,000,000-file cases are required measurements, not guarantees that each
+component supports those sizes. The 10,000,000-file case records and publishes
+a filesystem feasibility result when the host cannot allocate its required inodes. Use
+different output directories when preserving runs. A fixture has zero-byte contents; the
+workload is directory metadata.
 
 ## Protocol
 
@@ -74,7 +77,9 @@ preserving runs. A fixture has zero-byte contents; the workload is directory met
    Scrolling actions and visibility probes retain the 90-second limit.
    Assert model counts and first/last names. Scroll via each component's API to the first,
    middle and last files; require the corresponding accessible tree rows to appear. Return
-   to the start and sample. No traversal of all 100,000 visible DOM rows is required.
+   to the start and sample. No traversal of all millions of visible DOM rows is required.
+   For filenames wider than six digits, the fixture uses a wider common zero-padding width
+   so directory sorting remains numeric.
 5. After readiness, settle for one second. Record one natural (no forced GC) sample.
    Then record three retained samples 250 ms apart, forcing `HeapProfiler.collectGarbage`
    in every distinct V8 isolate before `Runtime.getHeapUsage`.
@@ -164,7 +169,7 @@ This benchmark is maintained by LVCE and does not predetermine the winner.
 ## CI and evidence
 
 Pull requests, main pushes, weekly schedules and manual dispatch run the full
-10,000- and 100,000-file / five-trial protocol on Ubuntu 24.04. Unit tests cover fixture integrity,
+10,000-, 100,000-, 1,000,000- and 10,000,000-file / five-trial protocol on Ubuntu 24.04. Unit tests cover fixture integrity,
 statistics and invalid-report rejection. A Chromium integration test verifies that
 worker allocations are included. Functional browser probes are part of every trial.
 The generated report is also checked in Chromium. Main publishes GitHub Pages only

@@ -3,6 +3,7 @@ import { readFile, readdir } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 export async function startServer(fixtureRoot, port = 0) {
+  let loadedEntries
   const server = createServer(async (request, response) => {
     try {
       const url = new URL(request.url, 'http://localhost')
@@ -11,10 +12,14 @@ export async function startServer(fixtureRoot, port = 0) {
       response.setHeader('Cross-Origin-Embedder-Policy', 'require-corp')
       if (url.pathname === '/entries') {
         if (!['empty', 'loaded'].includes(url.searchParams.get('state'))) throw new Error('Invalid state')
-        const entries = url.searchParams.get('state') === 'empty' ? [] : await readdir(fixtureRoot, { withFileTypes: true })
-        if (entries.some((entry) => !entry.isFile())) throw new Error('Flat fixture requires files only')
+        if (url.searchParams.get('state') === 'loaded' && !loadedEntries) {
+          const entries = await readdir(fixtureRoot, { withFileTypes: true })
+          if (entries.some((entry) => !entry.isFile())) throw new Error('Flat fixture requires files only')
+          loadedEntries = entries.map(({ name }) => ({ name, type: 7 })).sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0)
+        }
+        const entries = url.searchParams.get('state') === 'empty' ? [] : loadedEntries
         response.setHeader('Content-Type', 'application/json')
-        response.end(JSON.stringify(entries.map(({ name }) => ({ name, type: 7 })).sort((a, b) => a.name < b.name ? -1 : 1)))
+        response.end(JSON.stringify(entries))
         return
       }
       const name = url.pathname === '/' ? 'index.html' : url.pathname.slice(1)

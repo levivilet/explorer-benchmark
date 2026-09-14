@@ -6,7 +6,7 @@ import os from 'node:os'
 import { parseArgs } from 'node:util'
 import { setTimeout as delay } from 'node:timers/promises'
 import assert from 'node:assert/strict'
-import { createFixture, fileName, positiveInteger } from './fixture.js'
+import { createFixture, fileName, FixtureCapacityError, positiveInteger } from './fixture.js'
 import { startServer } from './server.js'
 import { measureHeaps } from './cdp.js'
 import { shuffle, summary } from './statistics.js'
@@ -21,8 +21,29 @@ const repeats = positiveInteger(values.repeats, 'repeats')
 const samples = positiveInteger(values.samples, 'samples')
 const seed = positiveInteger(values.seed, 'seed')
 const output = values.output
-const { root, manifest } = await createFixture(files)
 await mkdir(output, { recursive: true })
+let root
+let manifest
+try {
+  ({ root, manifest } = await createFixture(files))
+} catch (error) {
+  if (!(error instanceof FixtureCapacityError) || files !== 10_000_000) throw error
+  const feasibility = {
+    schemaVersion: 1,
+    status: 'infeasible',
+    files,
+    reason: error.message,
+    code: error.code,
+    details: error.details,
+    date: new Date().toISOString(),
+    commit: process.env.BENCHMARK_COMMIT || null,
+    runUrl: process.env.BENCHMARK_RUN_URL || null,
+    host: { platform: os.platform(), release: os.release(), arch: os.arch(), totalMemory: os.totalmem(), node: process.version },
+  }
+  await writeFile(`${output}/feasibility.json`, JSON.stringify(feasibility, null, 2) + '\n')
+  console.log(`${files.toLocaleString('en-US')}-file workload is infeasible: ${error.message}`)
+  process.exit(0)
+}
 const server = await startServer(root)
 const sources = JSON.parse(await readFile('sources.lock.json', 'utf8'))
 const packageLockSha256 = createHash('sha256').update(await readFile('package-lock.json')).digest('hex')
@@ -79,13 +100,13 @@ try {
           // Confirm actual DOM text at beginning, middle and end, crossing virtualized ranges.
           for (const index of [...new Set([0, Math.floor(files / 2), files - 1, 0])]) {
             await evaluate((index) => window.benchmark.scroll(index), index)
-            const row = page.getByRole('treeitem', { name: fileName(index), exact: true })
+            const row = page.getByRole('treeitem', { name: fileName(index, manifest.nameWidth), exact: true })
             await row.waitFor({ state: 'visible' })
             const box = await row.boundingBox()
             assert(box && box.y < 600 && box.y + box.height > 0 && box.x < 480, 'Row is outside tree viewport')
           }
           await evaluate(() => window.benchmark.scroll(0))
-          await page.getByRole('treeitem', { name: fileName(0), exact: true }).waitFor({ state: 'visible' })
+          await page.getByRole('treeitem', { name: fileName(0, manifest.nameWidth), exact: true }).waitFor({ state: 'visible' })
         } else assert.equal(await page.getByRole('treeitem').count(), 0)
         const readinessMs = performance.now() - start
         await delay(report.protocol.settleMs)

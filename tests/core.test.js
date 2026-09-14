@@ -4,8 +4,8 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { median, shuffle } from '../scripts/statistics.js'
-import { createFixture, positiveInteger } from '../scripts/fixture.js'
-import { aggregate, renderChart, renderTable } from '../scripts/report.js'
+import { createFixture, fileName, fileNameWidth, positiveInteger } from '../scripts/fixture.js'
+import { aggregate, renderChart, renderFeasibility, renderTable } from '../scripts/report.js'
 import { startServer } from '../scripts/server.js'
 
 test('statistics keep negative deltas and reject missing measurements', () => {
@@ -15,6 +15,10 @@ test('statistics keep negative deltas and reject missing measurements', () => {
   assert.throws(() => median([1, NaN]))
   assert.throws(() => positiveInteger('0', 'files'))
   assert.throws(() => positiveInteger('2.5', 'files'))
+  assert.equal(fileNameWidth(100000), 6)
+  assert.equal(fileNameWidth(1000001), 7)
+  assert.equal(fileName(999999, 7), 'file-0999999.txt')
+  assert(fileName(999999, 7) < fileName(1000000, 7))
   assert.deepEqual(shuffle([1, 2, 3, 4], 1729), shuffle([1, 2, 3, 4], 1729))
   assert.deepEqual(shuffle([1, 2, 3, 4], 1729).sort(), [1, 2, 3, 4])
 })
@@ -55,6 +59,12 @@ test('component load failures are shown without fabricated or cherry-picked memo
   assert.equal(groups.lvce.loaded, undefined)
   delete report.trials[0].componentFailure
   assert.throws(() => aggregate(report), /Missing component failure evidence/)
+})
+
+test('fixture feasibility evidence is rendered as a non-measurement', () => {
+  const html = renderFeasibility({ files: 10000000, reason: 'Not enough filesystem inodes', details: { availableInodes: '2', requiredInodes: '10000000' } })
+  assert.match(html, /10,000,000-file workload was infeasible/)
+  assert.match(html, /No component measurement was attempted/)
 })
 
 
