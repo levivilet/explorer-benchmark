@@ -103,6 +103,6 @@ test('reports sort successful comparisons by loaded heap and keep failures last'
   assert.deepEqual(orderIn(renderChart(groups)).every((position, index, positions) => index === 0 || position > positions[index - 1]), true)
   assert.deepEqual(orderIn(renderTable(groups)).every((position, index, positions) => index === 0 || position > positions[index - 1]), true)
   assert.match(renderChart(groups), /<rect[^>]+fill="#4db9aa"/)
-  assert.match(renderChart(groups), /Load failed \(1\/1\) — no memory result/)
+  assert.match(renderChart(groups), /Not supported \(1\/1\) — no memory result/)
   assert.deepEqual(Object.keys(aggregate(makeReport({ lvce: 300, pierre: 200, arborist: 100, headless: 400, jstree: 50 }))), ['jstree', 'arborist', 'pierre', 'lvce', 'headless'])
 })

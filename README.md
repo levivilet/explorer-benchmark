@@ -25,6 +25,7 @@ npx playwright install chromium  # Linux CI uses --with-deps
 npm test
 npm run test:cdp
 npm run test:adapters              # Repeated virtualized scrolling regression
+npm run test:crash                 # Actual Chromium crash and recovery regression
 npm run benchmark                # 10k, 100k, 1m and 10m files; five fresh trials per component
 npm run report
 npm run test:report
@@ -52,7 +53,7 @@ npm run serve
 # In the console: await benchmark.load('loaded')
 ```
 
-Options: `--files` (comma-separated sizes, each 1–10,000,000), `--repeats`, `--samples`, `--seed`, `--output`.
+Options: `--files` (comma-separated sizes, each 1–10,000,000), `--repeats`, `--samples`, `--seed`, `--output`, and `--implementation` (one of `lvce`, `pierre`, `arborist`, `headless`, `jstree`; defaults to all).
 The 100,000- and 1,000,000-file cases are required measurements, not guarantees that each
 component supports those sizes. The 10,000,000-file case records and publishes
 a filesystem feasibility result when the host cannot allocate its required inodes or the
@@ -91,12 +92,14 @@ workload is directory metadata.
 7. Take each trial's median across retained samples. Report median and min/max of those
    trial medians, and median of paired loaded-minus-empty differences. Negative differences
    remain negative. Fewer than three repeats are labeled smoke, not a comparison.
-8. Checkpoint every attempt, including failures. An explicit component load error is a
+8. Checkpoint every attempt, including failures. An explicit component load error, a loaded-tree timeout,
+   or a Chromium target crash/disconnection after a successful empty baseline is a
    benchmark outcome: show its message and failure count, with no aggregate memory number
    for that component/size. Do not cherry-pick successful trials if some loads fail.
    Harness/RPC/measurement errors, failed readiness probes, empty-tree initialization errors,
    and incomplete runs still fail CI and block deployment. Failures are never zero-byte measurements.
-   Close each browser in cleanup. Take screenshots after measurement so screenshot allocation
+   Record crash details and console errors without attempting to invent a memory value.
+   Screenshots are best effort; crashed targets may have none. Close each browser in cleanup. Take screenshots after measurement so screenshot allocation
    does not affect that phase's samples.
 
 ## Initial finding
@@ -170,13 +173,28 @@ This benchmark is maintained by LVCE and does not predetermine the winner.
 ## CI and evidence
 
 Pull requests, main pushes, weekly schedules and manual dispatch run the full
-10,000-, 100,000-, 1,000,000- and 10,000,000-file / five-trial protocol on Ubuntu 24.04. Unit tests cover fixture integrity,
+10,000-, 100,000-, 1,000,000- and 10,000,000-file / five-trial protocol on Ubuntu 24.04. Each implementation/file-count pair runs in its own job (20 parallel jobs, subject to runner availability),
+with fail-fast disabled. A final job downloads all shards, validates their complete trial inventory,
+source/fixture/dependency pins and protocol, then merges measurements and builds the report.
+Host metadata and original JSON remain available per job; trial order is randomized within each job,
+not globally across implementations. Missing jobs and harness failures still block publication.
+A 10M job that cannot run records host feasibility evidence without discarding other trees
+that completed that size. Unit tests cover fixture integrity,
 statistics and invalid-report rejection. A Chromium integration test verifies that
 worker allocations are included. Functional browser probes are part of every trial.
 The generated report is also checked in Chromium. Main publishes GitHub Pages only
 after all harness checks pass; component load failures remain visible outcomes. PRs publish downloadable artifacts without deploying.
 
-Each workload writes `results/<file-count>/results.json`. Each run uploads raw JSON, all successful/failed screenshots and the standalone
+Each workload writes `results/<file-count>/results.json`. To run an individual shard:
+
+```sh
+npm run benchmark -- --implementation lvce --files 100000 --output shards/lvce-100000
+# After collecting all 20 shards under shards/:
+npm run merge
+npm run report
+```
+
+The merge requires all five implementations at all four default sizes. Each run uploads raw JSON, all successful/failed screenshots and the standalone
 HTML report as a 90-day artifact. Pages includes JSON and screenshot downloads.
 To update a source, change its exact version/commit and integrity pin together,
 regenerate the npm lock when appropriate, and review a fresh comparison.

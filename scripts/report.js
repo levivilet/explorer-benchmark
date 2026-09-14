@@ -7,9 +7,16 @@ export function aggregate(report) {
   const { repeats } = report.protocol
   const inventory = report.protocol.implementations ?? ['lvce', 'pierre']
   if (!Array.isArray(inventory) || !inventory.length || new Set(inventory).size !== inventory.length || inventory.some((id) => !implementations.includes(id))) throw new Error('Invalid implementation inventory')
-  if (!Number.isSafeInteger(repeats) || repeats < 1 || report.trials.length !== repeats * inventory.length) throw new Error('Incomplete trial inventory')
+  const unavailable = report.unavailable ?? {}
+  if (Object.entries(unavailable).some(([id, evidence]) => !inventory.includes(id) || evidence.status !== 'infeasible' || !evidence.reason)) throw new Error('Invalid unavailable component evidence')
+  if (!Number.isSafeInteger(repeats) || repeats < 1 || report.trials.length !== repeats * (inventory.length - Object.keys(unavailable).length)) throw new Error('Incomplete trial inventory')
   const groups = {}
   for (const implementation of inventory) {
+    if (unavailable[implementation]) {
+      if (report.trials.some((trial) => trial.implementation === implementation)) throw new Error('Unavailable component has aggregate trials')
+      groups[implementation] = { unavailable: true, messages: [unavailable[implementation].reason] }
+      continue
+    }
     const trials = report.trials.filter((trial) => trial.implementation === implementation)
     if (trials.length !== repeats || new Set(trials.map((trial) => trial.repeat)).size !== repeats || trials.some((trial) => !Number.isInteger(trial.repeat) || trial.repeat < 0 || trial.repeat >= repeats)) throw new Error('Duplicate or missing trials')
     if (trials.some((trial) => !['passed', 'unsupported'].includes(trial.status))) throw new Error('Failed trials cannot produce a comparison')
@@ -46,15 +53,18 @@ export function renderChart(groups) {
   return `<svg viewBox="0 0 800 ${Object.keys(orderedGroups).length * 85 + 20}" role="img" aria-label="Retained JavaScript heap medians and ranges in MiB; failed loads have no bar"><title>Loaded tree retained JavaScript heap; lower uses less</title>${Object.entries(orderedGroups).map(([key, group], i) => {
     const y = 35 + i * 85
     const label = `<text x="0" y="${y + 22}" fill="currentColor" font-size="14">${labels[key]}</text>`
-    if (group.failures) return `${label}<text x="235" y="${y + 22}" fill="#ffbe85">Load failed (${group.failures}/${group.repeats}) — no memory result</text>`
+    if (group.unavailable) return `${label}<text x="235" y="${y + 22}" fill="#ffbe85">Workload infeasible — no memory result</text>`
+    if (group.failures) return `${label}<text x="235" y="${y + 22}" fill="#ffbe85">Not supported (${group.failures}/${group.repeats}) — no memory result</text>`
     const x = (value) => 235 + value / max * 430
     const fill = key === 'lvce' ? '#4db9aa' : '#c982de'
     return `${label}<rect x="235" y="${y}" width="${x(group.loaded.median) - 235}" height="32" rx="3" fill="${fill}"/><path d="M${x(group.loaded.min)},${y + 16}H${x(group.loaded.max)}" stroke="white" stroke-width="3"/><text x="${x(group.loaded.median) + 12}" y="${y + 53}" fill="currentColor">${mib(group.loaded.median)} MiB</text>`
   }).join('')}</svg>`
 }
 export function renderTable(groups) {
-  const rows = Object.entries(sortGroups(groups)).map(([key, group]) => group.failures
-    ? `<tr><th>${labels[key]}</th><td colspan="4" class="failure">${group.failures}/${group.repeats} loads failed: ${group.messages.map(escape).join('; ')}</td></tr>`
+  const rows = Object.entries(sortGroups(groups)).map(([key, group]) => group.unavailable
+    ? `<tr><th>${labels[key]}</th><td colspan="4" class="failure">Workload infeasible: ${group.messages.map(escape).join('; ')}</td></tr>`
+    : group.failures
+    ? `<tr><th>${labels[key]}</th><td colspan="4" class="failure">${group.failures}/${group.repeats} trials not supported: ${group.messages.map(escape).join('; ')}</td></tr>`
     : `<tr><th>${labels[key]}</th><td>${mib(group.empty.median)}</td><td>${mib(group.loaded.median)}</td><td>${mib(group.loaded.min)}–${mib(group.loaded.max)}</td><td>${mib(group.delta.median)}</td></tr>`).join('')
   return `<div class="scroll"><table><caption>MiB (1,048,576 bytes). Medians across independent trials; range of trial medians.</caption><thead><tr><th>Implementation</th><th>Empty</th><th>Loaded</th><th>Loaded range</th><th>Paired increase</th></tr></thead><tbody>${rows}</tbody></table></div>`
 }
@@ -72,8 +82,8 @@ ${renderChart(groups)}${renderTable(groups)}<small>Increase = loaded minus empty
 <h2>What was measured</h2><p>A fresh browser per trial; empty mounted tree followed by the populated tree and scrolling probes. Identical local directory listing, 480×600 tree viewport and 22-pixel rows. Load action limit: ${(report.protocol.loadTimeoutMs ?? 90000) / 1000} seconds for every component; scrolling actions and visibility probes: 90 seconds. Natural pre-GC samples, per-isolate heap details, backing-store and embedder counters, DOM counts, screenshots and failures are retained as evidence. The chart uses only the explicitly named V8 usedSize counter.</p>
 <p>LVCE uses pinned upstream explorer state, commands, sorting, virtualization and virtual DOM, in a dedicated worker with a minimal host. Editor filesystem/preferences/icon RPCs are replaced with fixture services. Pierre uses its vanilla FileTree API with normal input preparation. React Arborist uses its React Tree and built-in virtualization. Headless Tree uses the core sync loader with a minimal, nonvirtualized vanilla DOM host. jsTree uses jQuery and its full DOM rendering with default worker parsing. All disable file icon themes and leave search and Git decorations unexercised. Full application bootstraps, desktop apps, filesystem server, disk cache, Playwright and observer memory are excluded. The adapter and each component's own runtime costs remain included. Default overscan differs and is preserved.</p>
 <p>This flat-directory workload makes all files logically visible but preserves built-in virtualization where available; the Headless Tree DOM host and jsTree render every row. It does not establish behavior for deep trees, collapsed folders, file contents, edits, selection, or other sizes. Forced GC estimates retained heap, not allocation peaks. LVCE maintains this benchmark; results do not predetermine a winner.</p>
-<h2>Provenance</h2><p>Captured ${escape(report.date)} · Chromium ${escape(report.trials[0].chromium)} · ${escape(report.host.platform)} ${escape(report.host.arch)}<br>LVCE commit <code>${escape(report.sources.lvce.commit)}</code><br>${Object.entries(report.sources).filter(([, source]) => source.version).map(([id, source]) => `${escape(labels[id] ?? id)} ${escape(source.version)}`).join("<br>")}<br>Fixture SHA-256 <code>${escape(report.fixture.sha256)}</code><br>Dependency lock SHA-256 <code>${escape(report.packageLockSha256)}</code></p>
-<details><summary>Per-trial evidence</summary><ul>${report.trials.map((trial) => `<li>${labels[trial.implementation]} trial ${trial.repeat + 1}: ${trial.status === 'passed' ? `${mib(trial.phases.loaded.usedSize.median)} MiB · ${trial.phases.loaded.renderedRows} DOM rows` : `load failed: ${escape(trial.componentFailure.message)}`} · <a href="evidence/${trial.implementation}-${trial.repeat}-${trial.status === 'passed' ? 'loaded' : 'failed'}.png">screenshot</a></li>`).join('')}</ul></details></main></html>`
+<h2>Provenance</h2>${report.shards ? `<p>Each implementation ran in a separate CI job. Per-job host metadata and original results are preserved in the JSON and <code>shards/</code> evidence directories.</p>` : ''}<p>Captured ${escape(report.date)} · Chromium ${escape(report.trials[0].chromium)} · ${escape(report.host.platform)} ${escape(report.host.arch)}<br>LVCE commit <code>${escape(report.sources.lvce.commit)}</code><br>${Object.entries(report.sources).filter(([, source]) => source.version).map(([id, source]) => `${escape(labels[id] ?? id)} ${escape(source.version)}`).join("<br>")}<br>Fixture SHA-256 <code>${escape(report.fixture.sha256)}</code><br>Dependency lock SHA-256 <code>${escape(report.packageLockSha256)}</code></p>
+<details><summary>Per-trial evidence</summary><ul>${report.trials.map((trial) => `<li>${labels[trial.implementation]} trial ${trial.repeat + 1}: ${trial.status === 'passed' ? `${mib(trial.phases.loaded.usedSize.median)} MiB · ${trial.phases.loaded.renderedRows} DOM rows` : `load failed: ${escape(trial.componentFailure.message)}`}${trial.screenshots?.[trial.status === 'passed' ? 'loaded' : 'failed'] ? ` · <a href="evidence/${escape(trial.screenshots[trial.status === 'passed' ? 'loaded' : 'failed'])}">screenshot</a>` : ' · screenshot unavailable'}</li>`).join('')}</ul></details></main></html>`
   await writeFile(`${destination}/index.html`, html)
   return { report, groups }
 }

@@ -2,22 +2,26 @@ import { spawnSync } from 'node:child_process'
 import { access, mkdir, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import { parseArgs } from 'node:util'
+import { implementations } from './implementations.js'
 import { positiveInteger } from './fixture.js'
 const { values } = parseArgs({ options: {
   files: { type: 'string', default: '10000,100000,1000000,10000000' }, repeats: { type: 'string', default: '5' },
   samples: { type: 'string', default: '3' }, seed: { type: 'string', default: '1729' },
   output: { type: 'string', default: 'results' },
+  implementation: { type: 'string' },
 } })
+if (values.implementation && !implementations.includes(values.implementation)) throw new Error('Unknown implementation')
+const inventory = values.implementation ? [values.implementation] : implementations
 const files = values.files.split(',').map((value) => positiveInteger(value, 'files'))
 if (new Set(files).size !== files.length) throw new Error('Duplicate fixture sizes')
 await mkdir(values.output, { recursive: true })
-const manifest = { files, status: 'running', workloads: files.map((count) => ({ count, status: 'pending' })) }
+const manifest = { files, implementations: inventory, protocol: { repeats: positiveInteger(values.repeats, 'repeats'), samples: positiveInteger(values.samples, 'samples'), seed: positiveInteger(values.seed, 'seed') }, commit: process.env.BENCHMARK_COMMIT || null, runUrl: process.env.BENCHMARK_RUN_URL || null, status: 'running', workloads: files.map((count) => ({ count, status: 'pending' })) }
 await writeFile(`${values.output}/manifest.json`, JSON.stringify(manifest, null, 2))
 let failed = false
 for (const workload of manifest.workloads) {
   const { count } = workload
   const timeoutMs = count === 10_000_000 ? 15 * 60 * 1000 : undefined
-  const result = spawnSync(process.execPath, ['scripts/benchmark.js', '--files', String(count), '--repeats', values.repeats, '--samples', values.samples, '--seed', values.seed, '--output', `${values.output}/${count}`], { stdio: 'inherit', timeout: timeoutMs })
+  const result = spawnSync(process.execPath, ['scripts/benchmark.js', ...(values.implementation ? ['--implementation', values.implementation] : []), '--files', String(count), '--repeats', values.repeats, '--samples', values.samples, '--seed', values.seed, '--output', `${values.output}/${count}`], { stdio: 'inherit', timeout: timeoutMs })
   if (count === 10_000_000 && result.error?.code === 'ETIMEDOUT') {
     const feasibility = {
       schemaVersion: 1,
