@@ -47,6 +47,8 @@ jobs:
       - run: npm run setup
       - run: npm run build
       - run: npx playwright install --with-deps chromium
+      - name: Prepare ${{ matrix.files }} synthetic entries
+        run: npm run fixture -- --files ${{ matrix.files }}
       - name: Benchmark ${{ matrix.implementation }} with ${{ matrix.files }} files
         env:
           BENCHMARK_COMMIT: ${{ github.sha }}

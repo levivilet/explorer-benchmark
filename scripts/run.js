@@ -3,9 +3,9 @@ import { access, mkdir, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import { parseArgs } from 'node:util'
 import { implementations } from './implementations.js'
-import { positiveInteger } from './fixture.js'
+import { DEFAULT_FILES, positiveInteger } from './fixture.js'
 const { values } = parseArgs({ options: {
-  files: { type: 'string', default: '10000,100000,1000000,10000000' }, repeats: { type: 'string', default: '5' },
+  files: { type: 'string', default: DEFAULT_FILES }, repeats: { type: 'string', default: '5' },
   samples: { type: 'string', default: '3' }, seed: { type: 'string', default: '1729' },
   output: { type: 'string', default: 'results' },
   implementation: { type: 'string' },

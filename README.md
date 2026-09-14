@@ -6,12 +6,11 @@ Reproducible memory comparison of [LVCE explorer-view](https://github.com/lvce-e
 [Live results](https://levivilet.github.io/explorer-benchmark/) ·
 [Run benchmark](https://github.com/levivilet/explorer-benchmark/actions/workflows/benchmark.yml)
 
-The default workloads are **10,000, 100,000, 1,000,000 and 10,000,000 empty files, each in one directory**. All implementations
-load that directory listing, expose all entries in their tree model, and
+The default workloads are **10,000, 100,000, 1,000,000 and 10,000,000 synthetic file entries, each workload representing one open directory**. All implementations
+load the same prepared JSON directory listing, expose all entries in their tree model, and
 render the first, middle and last files on demand. Built-in virtualization remains enabled. The minimal Headless Tree DOM host and jsTree
 render all rows; no external virtualizer is added. DOM row counts expose this difference. Names are zero-padded to a width that keeps
-lexicographic and numeric order identical (`file-000000.txt` through `file-099999.txt` for 100,000 files). Generated directories are
-`.tmp/fixtures/10000`, `.tmp/fixtures/100000`, `.tmp/fixtures/1000000` and `.tmp/fixtures/10000000`.
+lexicographic and numeric order identical (`file-000000.txt` through `file-099999.txt` for 100,000 files). Each workload has an `entries.json` and `manifest.json` under `.tmp/fixtures-json/<count>/`. No individual files are created.
 
 ## Run
 
@@ -26,6 +25,7 @@ npm test
 npm run test:cdp
 npm run test:adapters              # Repeated virtualized scrolling regression
 npm run test:crash                 # Actual Chromium crash and recovery regression
+npm run fixture                  # Prepare all JSON fixtures outside the benchmark budget
 npm run benchmark                # 10k, 100k, 1m and 10m files; five fresh trials per component
 npm run report
 npm run test:report
@@ -34,16 +34,16 @@ python3 -m http.server 8080 --directory .tmp/pages
 
 On platforms without `nice`, use `npm ci`. The benchmark requires no GitHub token,
 root privileges, editor installation, or access to your existing workspaces.
-Only generated fixture files are written. Do not add personal files to `.tmp/fixtures`.
-Fixture generation checks for unexpected entries and fails rather than deleting them.
+Setup writes only the JSON fixtures and manifests in `.tmp/fixtures-json`; it does not access existing workspaces or old `.tmp/fixtures` directories. Benchmark execution requires a completed setup and fails with preparation instructions if a fixture is missing.
 
 ```sh
 # Quick adapter/CDP smoke; explicitly labeled as too few trials for comparison:
+npm run fixture -- --files 1000
 npm run benchmark -- --files 1000 --repeats 1 --samples 1 --output results-smoke
 node scripts/report-all.js results-smoke .tmp/smoke-pages
 
 # Open the components manually after generating/building:
-npm run fixture
+npm run fixture -- --files 100000
 npm run serve
 # http://127.0.0.1:4173/?implementation=lvce
 # http://127.0.0.1:4173/?implementation=pierre
@@ -56,17 +56,16 @@ npm run serve
 Options: `--files` (comma-separated sizes, each 1–10,000,000), `--repeats`, `--samples`, `--seed`, `--output`, and `--implementation` (one of `lvce`, `pierre`, `arborist`, `headless`, `jstree`; defaults to all).
 The 100,000- and 1,000,000-file cases are required measurements, not guarantees that each
 component supports those sizes. The 10,000,000-file case records and publishes
-a filesystem feasibility result when the host cannot allocate its required inodes or the
-bounded 15-minute attempt cannot complete. Use
-different output directories when preserving runs. A fixture has zero-byte contents; the
-workload is directory metadata.
+a feasibility result when the bounded 15-minute benchmark attempt cannot complete. Fixture generation is a separate CI step and is excluded from that budget. Use
+different output directories when preserving runs. This measures frontend directory metadata handling; file contents and filesystem enumeration are outside its scope.
 
 ## Protocol
 
-1. Generate actual files with bounded write concurrency. Hash the sorted, newline-separated
-   file names (including the final newline), verify the count/types/names, and record the manifest.
-   A common loopback server reads these files using `readdir`; it does not generate a synthetic
-   list in the browser. All adapters receive the same sorted `{name, type}` listing.
+1. Prepare synthetic `{name, type}` entries in batches of 10,000 and stream them to one JSON file per size. Hash the sorted, newline-separated
+   file names (including the final newline) and record the count, name width, endpoints and JSON byte size in a completion manifest.
+   Setup uses bounded memory and creates no individual files. A common loopback server streams the prepared JSON unchanged on each loaded request;
+   it does not enumerate a directory, sort, or serialize entries during trials. Every adapter receives the same listing.
+   Benchmark execution reads the manifest and checks the JSON size; it never generates missing fixtures. Downloading and parsing JSON in the browser remain part of load readiness.
 2. Pin the LVCE source commit and download checksum in `sources.lock.json`. Pin all npm components,
    LVCE runtime dependencies, esbuild and Playwright in `package-lock.json`. Build production,
    minified bundles with the same bundler. Chromium is Playwright's matching revision.
@@ -188,6 +187,7 @@ after all harness checks pass; component load failures remain visible outcomes. 
 Each workload writes `results/<file-count>/results.json`. To run an individual shard:
 
 ```sh
+npm run fixture -- --files 100000
 npm run benchmark -- --implementation lvce --files 100000 --output shards/lvce-100000
 # After collecting all 20 shards under shards/:
 npm run merge

@@ -1,9 +1,13 @@
 import { createHash } from 'node:crypto'
-import { access, mkdir, readdir, statfs, writeFile } from 'node:fs/promises'
+import { createWriteStream } from 'node:fs'
+import { mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
+import { pipeline } from 'node:stream/promises'
 import { pathToFileURL } from 'node:url'
 
 export const MAX_FIXTURE_FILES = 10_000_000
+export const DEFAULT_FILES = '10000,100000,1000000,10000000'
+const fixtureBase = '.tmp/fixtures-json'
 export const fileNameWidth = (count) => Math.max(6, String(count - 1).length)
 export const fileName = (index, width = 6) => `file-${String(index).padStart(width, '0')}.txt`
 export const digestNames = (names) => createHash('sha256').update(names.join('\n') + '\n').digest('hex')
@@ -12,58 +16,66 @@ export const positiveInteger = (value, name) => {
   if (!Number.isSafeInteger(number) || number < 1) throw new Error(`${name} must be a positive integer`)
   return number
 }
-export class FixtureCapacityError extends Error {
-  constructor(message, details) {
-    super(message)
-    this.name = 'FixtureCapacityError'
-    this.code = 'FIXTURE_CAPACITY'
-    this.details = details
-  }
-}
-async function checkCapacity(count, base) {
-  const basePath = resolve(base)
-  await mkdir(basePath, { recursive: true })
-  try { await access(resolve(basePath, String(count))) } catch (error) {
-    if (error.code !== 'ENOENT') throw error
-    let filesystem
-    try { filesystem = await statfs(basePath, { bigint: true }) } catch (error) {
-      if (error.code === 'ENOSYS' || error.code === 'ERR_METHOD_NOT_IMPLEMENTED') return
-      throw error
-    }
-    const requiredInodes = BigInt(count)
-    if (filesystem.ffree < requiredInodes) {
-      const details = {
-        path: basePath,
-        availableInodes: filesystem.ffree.toString(),
-        requiredInodes: requiredInodes.toString(),
-        availableBytes: (filesystem.bavail * filesystem.bsize).toString(),
-      }
-      throw new FixtureCapacityError(`Not enough filesystem inodes for ${count.toLocaleString('en-US')} files`, details)
-    }
-  }
-}
-export async function createFixture(count = 100000, base = '.tmp/fixtures') {
+const validateCount = (count) => {
   positiveInteger(count, 'files')
   if (count > MAX_FIXTURE_FILES) throw new Error(`Maximum fixture size is ${MAX_FIXTURE_FILES.toLocaleString('en-US')} files`)
-  await checkCapacity(count, base)
+}
+export async function createFixture(count = 100000, base = fixtureBase) {
+  validateCount(count)
   const root = resolve(base, String(count))
   const width = fileNameWidth(count)
   await mkdir(root, { recursive: true })
-  // Bounded filesystem concurrency; zero-byte files isolate directory metadata.
-  let next = 0
-  await Promise.all(Array.from({ length: 32 }, async () => {
-    while (next < count) {
-      const index = next++
-      await writeFile(`${root}/${fileName(index, width)}`, '')
+  // A manifest marks a fully generated fixture; never accept an interrupted replacement.
+  await rm(`${root}/manifest.json`, { force: true })
+  const hash = createHash('sha256')
+  async function* chunks() {
+    yield '['
+    for (let offset = 0; offset < count; offset += 10000) {
+      const entries = []
+      const names = []
+      for (let index = offset; index < Math.min(offset + 10000, count); index++) {
+        const name = fileName(index, width)
+        names.push(name)
+        entries.push(JSON.stringify({ name, type: 7 }))
+      }
+      hash.update(names.join('\n') + '\n')
+      yield (offset === 0 ? '' : ',') + entries.join(',')
     }
-  }))
-  const entries = await readdir(root, { withFileTypes: true })
-  const names = entries.map((entry) => entry.name).sort()
-  if (entries.some((entry) => !entry.isFile()) || names.length !== count || names.some((name, i) => name !== fileName(i, width))) {
-    throw new Error('Fixture has unexpected entries')
+    yield ']'
   }
-  const manifest = { count, shape: 'flat', fileBytes: 0, nameWidth: width, first: names[0], last: names.at(-1), sha256: digestNames(names) }
-  await writeFile(`${root}.json`, JSON.stringify(manifest, null, 2) + '\n')
+  // Stream bounded batches instead of allocating millions of objects or filesystem inodes.
+  await pipeline(chunks(), createWriteStream(`${root}/entries.json.tmp`))
+  await rename(`${root}/entries.json.tmp`, `${root}/entries.json`)
+  const { size: jsonBytes } = await stat(`${root}/entries.json`)
+  const manifest = { count, shape: 'flat', source: 'synthetic-json', fileBytes: 0, nameWidth: width, first: fileName(0, width), last: fileName(count - 1, width), sha256: hash.digest('hex'), jsonBytes }
+  await writeFile(`${root}/manifest.json.tmp`, JSON.stringify(manifest, null, 2) + '\n')
+  await rename(`${root}/manifest.json.tmp`, `${root}/manifest.json`)
   return { root, manifest }
 }
-if (import.meta.url === pathToFileURL(process.argv[1]).href) console.log(await createFixture(positiveInteger(process.argv[2] || 100000, 'files')))
+export async function loadFixture(count, base = fixtureBase) {
+  validateCount(count)
+  const root = resolve(base, String(count))
+  let manifest
+  try { manifest = JSON.parse(await readFile(`${root}/manifest.json`, 'utf8')) } catch (error) {
+    throw new Error(`Fixture ${count} is not prepared. Run npm run fixture -- --files ${count} first.`, { cause: error })
+  }
+  const width = fileNameWidth(count)
+  if (manifest.source !== 'synthetic-json' || manifest.count !== count || manifest.shape !== 'flat' || manifest.nameWidth !== width || manifest.first !== fileName(0, width) || manifest.last !== fileName(count - 1, width) || !/^[a-f0-9]{64}$/.test(manifest.sha256) || !Number.isSafeInteger(manifest.jsonBytes)) {
+    throw new Error(`Invalid fixture manifest for ${count}`)
+  }
+  const { size } = await stat(`${root}/entries.json`)
+  if (size !== manifest.jsonBytes) throw new Error(`Fixture ${count} JSON size does not match its manifest; regenerate it`)
+  return { root, manifest }
+}
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const { parseArgs } = await import('node:util')
+  const { values } = parseArgs({ options: { files: { type: 'string', default: DEFAULT_FILES } } })
+  const counts = values.files.split(',').map(value => positiveInteger(value, 'files'))
+  if (new Set(counts).size !== counts.length) throw new Error('Duplicate fixture sizes')
+  counts.forEach(validateCount)
+  for (const count of counts) {
+    const start = performance.now()
+    const { manifest } = await createFixture(count)
+    console.log(`Prepared ${count.toLocaleString('en-US')} synthetic entries (${manifest.jsonBytes} JSON bytes) in ${((performance.now() - start) / 1000).toFixed(2)} seconds`)
+  }
+}

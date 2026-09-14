@@ -1,10 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { median, shuffle } from '../scripts/statistics.js'
-import { createFixture, fileName, fileNameWidth, positiveInteger } from '../scripts/fixture.js'
+import { createFixture, digestNames, fileName, fileNameWidth, loadFixture, positiveInteger } from '../scripts/fixture.js'
 import { aggregate, renderChart, renderFeasibility, renderTable } from '../scripts/report.js'
 import { startServer } from '../scripts/server.js'
 
@@ -22,22 +22,48 @@ test('statistics keep negative deltas and reject missing measurements', () => {
   assert.deepEqual(shuffle([1, 2, 3, 4], 1729), shuffle([1, 2, 3, 4], 1729))
   assert.deepEqual(shuffle([1, 2, 3, 4], 1729).sort(), [1, 2, 3, 4])
 })
-test('fixture is repeatable, served from disk, and rejects contamination', async () => {
+test('synthetic fixture is repeatable across batches and served unchanged', async () => {
   const base = await mkdtemp(join(tmpdir(), 'explorer-benchmark-test-'))
   let server
   try {
-    const first = await createFixture(12, base)
-    const second = await createFixture(12, base)
+    const count = 10001
+    const first = await createFixture(count, base)
+    const second = await createFixture(count, base)
     assert.deepEqual(first.manifest, second.manifest)
+    assert.deepEqual(await readdir(first.root), ['entries.json', 'manifest.json'])
+    const prepared = await loadFixture(count, base)
+    assert.deepEqual(prepared, first)
+    const json = await readFile(`${first.root}/entries.json`, 'utf8')
+    const expected = Array.from({ length: count }, (_, index) => ({ name: fileName(index), type: 7 }))
+    assert.deepEqual(JSON.parse(json), expected)
+    assert.equal(first.manifest.sha256, digestNames(expected.map(entry => entry.name)))
+    assert.equal(first.manifest.jsonBytes, Buffer.byteLength(json))
     server = await startServer(first.root)
-    const entries = await (await fetch(`${server.url}/entries?state=loaded`)).json()
-    assert.equal(entries.length, 12)
-    assert.equal(entries[11].name, 'file-000011.txt')
+    for (let repeat = 0; repeat < 2; repeat++) {
+      const response = await fetch(`${server.url}/entries?state=loaded`)
+      assert.equal(Number(response.headers.get('content-length')), Buffer.byteLength(json))
+      assert.equal(await response.text(), json)
+    }
     assert.deepEqual(await (await fetch(`${server.url}/entries?state=empty`)).json(), [])
+    assert.equal((await fetch(`${server.url}/entries?state=unknown`)).status, 500)
     assert.equal((await fetch(`${server.url}/sources.lock.json`)).status, 404)
-    await writeFile(`${first.root}/extra.txt`, '')
-    await assert.rejects(createFixture(12, base), /unexpected entries/)
+    await writeFile(`${first.root}/entries.json`, '[]')
+    await assert.rejects(loadFixture(count, base), /size does not match/)
   } finally { await server?.close(); await rm(base, { recursive: true, force: true }) }
+})
+
+test('loading requires a completed setup and never generates a fixture', async () => {
+  const base = await mkdtemp(join(tmpdir(), 'explorer-benchmark-test-'))
+  try {
+    await assert.rejects(loadFixture(12, base), /npm run fixture -- --files 12/)
+    assert.deepEqual(await readdir(base), [])
+    const { root, manifest } = await createFixture(12, base)
+    await writeFile(`${root}/manifest.json`, JSON.stringify({ ...manifest, count: 13 }))
+    await assert.rejects(loadFixture(12, base), /Invalid fixture manifest/)
+    await rm(`${root}/manifest.json`)
+    await assert.rejects(loadFixture(12, base), /not prepared/)
+    await assert.rejects(createFixture(10000001, base), /Maximum fixture size/)
+  } finally { await rm(base, { recursive: true, force: true }) }
 })
 test('report refuses failed, duplicate, or incomplete trials', () => {
   const makeTrial = (implementation) => ({ implementation, repeat: 0, status: 'passed', deltaUsedSize: 2, phases: { empty: { usedSize: { median: 1 } }, loaded: { usedSize: { median: 3 } } } })
