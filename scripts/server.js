@@ -1,9 +1,13 @@
 import { createServer } from 'node:http'
-import { readFile, readdir } from 'node:fs/promises'
+import { readFile, stat } from 'node:fs/promises'
+import { createReadStream } from 'node:fs'
+import { pipeline } from 'node:stream/promises'
+import { loadFixture } from './fixture.js'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 export async function startServer(fixtureRoot, port = 0) {
-  let loadedEntries
+  const entriesPath = resolve(fixtureRoot, 'entries.json')
+  const { size: jsonBytes } = await stat(entriesPath)
   const server = createServer(async (request, response) => {
     try {
       const url = new URL(request.url, 'http://localhost')
@@ -12,14 +16,13 @@ export async function startServer(fixtureRoot, port = 0) {
       response.setHeader('Cross-Origin-Embedder-Policy', 'require-corp')
       if (url.pathname === '/entries') {
         if (!['empty', 'loaded'].includes(url.searchParams.get('state'))) throw new Error('Invalid state')
-        if (url.searchParams.get('state') === 'loaded' && !loadedEntries) {
-          const entries = await readdir(fixtureRoot, { withFileTypes: true })
-          if (entries.some((entry) => !entry.isFile())) throw new Error('Flat fixture requires files only')
-          loadedEntries = entries.map(({ name }) => ({ name, type: 7 })).sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0)
-        }
-        const entries = url.searchParams.get('state') === 'empty' ? [] : loadedEntries
         response.setHeader('Content-Type', 'application/json')
-        response.end(JSON.stringify(entries))
+        if (url.searchParams.get('state') === 'empty') {
+          response.end('[]')
+        } else {
+          response.setHeader('Content-Length', jsonBytes)
+          await pipeline(createReadStream(entriesPath), response)
+        }
         return
       }
       const name = url.pathname === '/' ? 'index.html' : url.pathname.slice(1)
@@ -28,12 +31,16 @@ export async function startServer(fixtureRoot, port = 0) {
       }
       response.setHeader('Content-Type', name.endsWith('.js') ? 'text/javascript' : name.endsWith('.svg') ? 'image/svg+xml' : 'text/html')
       response.end(await readFile(resolve('dist', name)))
-    } catch (error) { response.writeHead(500).end(String(error)) }
+    } catch (error) {
+      if (!response.headersSent && !response.destroyed) response.writeHead(500).end(String(error))
+      else response.destroy()
+    }
   })
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, '127.0.0.1', resolve) })
   return { url: `http://127.0.0.1:${server.address().port}`, close: () => new Promise((resolve) => server.close(resolve)) }
 }
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const server = await startServer(resolve('.tmp/fixtures', process.argv[2] || '100000'), 4173)
+  const { root } = await loadFixture(Number(process.argv[2] || '100000'))
+  const server = await startServer(root, 4173)
   console.log(`${server.url}/?implementation=lvce and ?implementation=pierre`)
 }

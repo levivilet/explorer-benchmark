@@ -13,6 +13,19 @@ async function attempt(output, scenario, repeat = 0) {
     server: { url: 'http://benchmark.test' },
     launchBrowser: async () => {
       const browser = await chromium.launch()
+      if (scenario === 'disconnect with unresponsive CDP') {
+        const newBrowserCDPSession = browser.newBrowserCDPSession.bind(browser)
+        let firstSession = true
+        browser.newBrowserCDPSession = async () => {
+          const session = await newBrowserCDPSession()
+          if (firstSession) {
+            firstSession = false
+            // The observer's detach request can stop replying while Chromium exits.
+            session.detach = () => new Promise(() => {})
+          }
+          return session
+        }
+      }
       const newPage = browser.newPage.bind(browser)
       browser.newPage = async (options) => {
         const page = await newPage(options)
@@ -33,7 +46,7 @@ async function attempt(output, scenario, repeat = 0) {
               await crashed
               return evaluate(fn, argument)
             }
-            if (scenario === 'disconnect') { await browser.close(); return evaluate(fn, argument) }
+            if (scenario.startsWith('disconnect')) { await browser.close(); return evaluate(fn, argument) }
             if (scenario === 'rpc error') throw new Error('Broken benchmark RPC')
             if (scenario === 'component failure') return { componentFailure: { message: 'Too many entries' } }
           }
@@ -47,7 +60,7 @@ async function attempt(output, scenario, repeat = 0) {
   })
 }
 
-for (const scenario of ['crash', 'disconnect', 'empty crash', 'rpc error', 'component failure']) {
+for (const scenario of ['crash', 'disconnect', 'disconnect with unresponsive CDP', 'empty crash', 'rpc error', 'component failure']) {
   test(`trial recovery: ${scenario}`, { timeout: 20000 }, async () => {
     const output = await mkdtemp(join(tmpdir(), 'explorer-crash-'))
     try {
