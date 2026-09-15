@@ -30,6 +30,7 @@ jobs:
       - run: npm run test:adapters
       - run: npm run test:crash
   benchmark:
+    needs: test
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     strategy:
