@@ -171,7 +171,7 @@ This benchmark is maintained by LVCE and does not predetermine the winner.
 
 ## CI and evidence
 
-Pull requests, main pushes, weekly schedules and manual dispatch run the full
+Pull requests, main pushes and manual dispatch run the full
 10,000-, 100,000-, 1,000,000- and 10,000,000-file / five-trial protocol on Ubuntu 24.04. Each implementation/file-count pair runs in its own job (20 parallel jobs, subject to runner availability),
 with fail-fast disabled. A final job downloads all shards, validates their complete trial inventory,
 source/fixture/dependency pins and protocol, then merges measurements and builds the report.
