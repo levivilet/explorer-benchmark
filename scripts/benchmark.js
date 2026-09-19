@@ -27,7 +27,7 @@ const output = values.output
 await mkdir(output, { recursive: true })
 const { root, manifest } = await loadFixture(files)
 const server = await startServer(root)
-const sources = JSON.parse(await readFile('sources.lock.json', 'utf8'))
+const sources = JSON.parse(await readFile('config/sources.lock.json', 'utf8'))
 const packageLockSha256 = createHash('sha256').update(await readFile('package-lock.json')).digest('hex')
 const order = shuffle(Array.from({ length: repeats }, (_, repeat) => inventory.map((implementation) => ({ implementation, repeat }))).flat(), seed)
 const report = {

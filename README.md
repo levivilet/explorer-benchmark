@@ -66,7 +66,7 @@ different output directories when preserving runs. This measures frontend direct
    Setup uses bounded memory and creates no individual files. A common loopback server streams the prepared JSON unchanged on each loaded request;
    it does not enumerate a directory, sort, or serialize entries during trials. Every adapter receives the same listing.
    Benchmark execution reads the manifest and checks the JSON size; it never generates missing fixtures. Downloading and parsing JSON in the browser remain part of load readiness.
-2. Pin the LVCE source commit and download checksum in `sources.lock.json`. Pin all npm components,
+2. Pin the LVCE source commit and download checksum in `config/sources.lock.json`. Pin all npm components,
    LVCE runtime dependencies, esbuild and Playwright in `package-lock.json`. Build production,
    minified bundles with the same bundler. Chromium is Playwright's matching revision.
 3. Shuffle trials once per job with recorded seed 1729. Run one browser/component at a time within each job.
