@@ -47,6 +47,7 @@ test('synthetic fixture is repeatable across batches and served unchanged', asyn
     assert.deepEqual(await (await fetch(`${server.url}/entries?state=empty`)).json(), [])
     assert.equal((await fetch(`${server.url}/entries?state=unknown`)).status, 500)
     assert.equal((await fetch(`${server.url}/sources.lock.json`)).status, 404)
+    assert.equal((await fetch(`${server.url}/config/sources.lock.json`)).status, 404)
     await writeFile(`${first.root}/entries.json`, '[]')
     await assert.rejects(loadFixture(count, base), /size does not match/)
   } finally { await server?.close(); await rm(base, { recursive: true, force: true }) }

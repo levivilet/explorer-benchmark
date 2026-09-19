@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { mkdir, readFile, writeFile, rm } from 'node:fs/promises'
 import { execFileSync } from 'node:child_process'
-const { lvce } = JSON.parse(await readFile('sources.lock.json', 'utf8'))
+const { lvce } = JSON.parse(await readFile('config/sources.lock.json', 'utf8'))
 const response = await fetch(lvce.url)
 if (!response.ok) throw new Error(`Source download: ${response.status}`)
 const bytes = Buffer.from(await response.arrayBuffer())
