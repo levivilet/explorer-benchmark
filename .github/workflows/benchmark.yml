@@ -19,7 +19,17 @@ jobs:
         with:
           node-version-file: '.nvmrc'
           cache: npm
+      - name: Compute node modules cache key
+        id: node-modules-cache-key
+        run: echo "value=$(node scripts/compute-node-modules-cache-key.js)" >> "$GITHUB_OUTPUT"
+        shell: bash
+      - uses: actions/cache@v6
+        id: node-modules-cache
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-${{ runner.arch }}-node-modules-${{ steps.node-modules-cache-key.outputs.value }}
       - run: npm ci
+        if: steps.node-modules-cache.outputs.cache-hit != 'true'
       - run: npm test
       - run: npm run setup
       - run: npm run build
@@ -42,7 +52,17 @@ jobs:
         with:
           node-version-file: '.nvmrc'
           cache: npm
+      - name: Compute node modules cache key
+        id: node-modules-cache-key
+        run: echo "value=$(node scripts/compute-node-modules-cache-key.js)" >> "$GITHUB_OUTPUT"
+        shell: bash
+      - uses: actions/cache@v6
+        id: node-modules-cache
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-${{ runner.arch }}-node-modules-${{ steps.node-modules-cache-key.outputs.value }}
       - run: npm ci
+        if: steps.node-modules-cache.outputs.cache-hit != 'true'
       - run: npm run setup
       - run: npm run build
       - run: npx playwright install --with-deps chromium
@@ -71,7 +91,17 @@ jobs:
         with:
           node-version-file: '.nvmrc'
           cache: npm
+      - name: Compute node modules cache key
+        id: node-modules-cache-key
+        run: echo "value=$(node scripts/compute-node-modules-cache-key.js)" >> "$GITHUB_OUTPUT"
+        shell: bash
+      - uses: actions/cache@v6
+        id: node-modules-cache
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-${{ runner.arch }}-node-modules-${{ steps.node-modules-cache-key.outputs.value }}
       - run: npm ci
+        if: steps.node-modules-cache.outputs.cache-hit != 'true'
       - uses: actions/download-artifact@v5
         with:
           pattern: explorer-shard-*
