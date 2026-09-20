@@ -1,3 +1,40 @@
+// The fixture is a JSON array of flat {name,type} records. Parse complete batches
+// while retaining the full entry array, without also retaining a multi-GB string.
+export async function parseEntries(response) {
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder('utf-8', { fatal: true })
+  const entries = []
+  let pending = ''
+  let started = false
+  const append = (json) => {
+    for (const entry of JSON.parse(`[${json}]`)) {
+      if (!/^file-[0-9]+\.txt$/.test(entry.name) || entry.type !== 7) throw new Error('Invalid fixture entry')
+      entries.push(entry)
+    }
+  }
+  try {
+    while (true) {
+      const { value, done } = await reader.read()
+      pending += decoder.decode(value, { stream: !done })
+      if (!started && pending.length) {
+        if (pending[0] !== '[') throw new SyntaxError('Missing fixture array start')
+        pending = pending.slice(1)
+        started = true
+      }
+      const boundary = pending.lastIndexOf('},')
+      if (boundary !== -1) {
+        append(pending.slice(0, boundary + 1))
+        pending = pending.slice(boundary + 2)
+      }
+      if (done) break
+    }
+    if (!started || !pending.endsWith(']')) throw new SyntaxError('Incomplete fixture array')
+    if (entries.length && pending === ']') throw new SyntaxError('Trailing fixture comma')
+    append(pending.slice(0, -1))
+    return entries
+  } finally { reader.releaseLock() }
+}
+
 // Progress lives in the observer server so it survives a page or worker crash.
 export async function readEntries(state) {
   const mark = async (stage) => {
@@ -9,7 +46,7 @@ export async function readEntries(state) {
   if (!response.ok) throw new Error(`Directory read: ${response.status}`)
   let entries
   try {
-    entries = await response.json()
+    entries = await parseEntries(response)
   } catch (error) {
     // Malformed JSON and transport errors remain harness failures that block CI.
     if (error instanceof RangeError) throw new Error(`INPUT_CAPACITY: ${error.message}`)

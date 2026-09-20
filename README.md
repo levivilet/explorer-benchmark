@@ -65,7 +65,7 @@ different output directories when preserving runs. This measures frontend direct
    file names (including the final newline) and record the count, name width, endpoints and JSON byte size in a completion manifest.
    Setup uses bounded memory and creates no individual files. A common loopback server streams the prepared JSON unchanged on each loaded request;
    it does not enumerate a directory, sort, or serialize entries during trials. Every adapter receives the same listing.
-   Benchmark execution reads the manifest and checks the JSON size; it never generates missing fixtures. Downloading and parsing JSON in the browser remain part of load readiness.
+   Benchmark execution reads the manifest and checks the JSON size; it never generates missing fixtures. Downloading and parsing JSON in the browser remain part of load readiness. Adapters parse streamed batches into the complete entry array, avoiding a second multi-gigabyte response string; no component sees a partial listing.
 2. Pin the LVCE source commit and download checksum in `config/sources.lock.json`. Pin all npm components,
    LVCE runtime dependencies, esbuild and Playwright in `package-lock.json`. Build production,
    minified bundles with the same bundler. Chromium is Playwright's matching revision.
@@ -215,7 +215,13 @@ of free disk per shard for this fixture, in addition to dependencies and artifac
 Each CI shard has its own Ubuntu host and a 15-minute trial budget; five fresh
 trials are planned, with the same empty baseline and readiness/GC requirements.
 
-At this size the JSON transport/parser itself may exceed browser capacity before
+The original 100M CI experiment generated the complete fixture but all five trees
+encountered `TypeError: Failed to fetch` while consuming the monolithic JSON body.
+The input reader now parses streamed batches into a full array instead of asking
+Chromium to buffer and decode the entire response at once. Transport errors remain
+fatal; this does not reclassify a generic fetch error as a capacity result.
+
+At this size the full entry array itself may exceed browser capacity before
 a component receives its input. The adapters acknowledge `input` and `input-parsed`
 to the observer server, including from LVCE's worker. Crashes, load timeouts and
 explicit parser RangeErrors during `input` are labeled **Input/harness limit**,

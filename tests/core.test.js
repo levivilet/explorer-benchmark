@@ -150,7 +150,7 @@ test('input parser capacity is distinguished from malformed data and HTTP failur
   t.mock.method(globalThis, 'fetch', async (url) => {
     calls.push(url)
     if (url.startsWith('/load-stage')) return { ok: true }
-    return { ok: status === 200, status, json: async () => { if (failure) throw failure; return [{ name: 'file-00000000.txt', type: 7 }] } }
+    return { ok: status === 200, status, body: new ReadableStream({ start(controller) { if (failure) controller.error(failure); else { controller.enqueue(new TextEncoder().encode('[{"name":"file-00000000.txt","type":7}]')); controller.close() } } }) }
   })
   assert.deepEqual(await readEntries('loaded'), [{ name: 'file-00000000.txt', type: 7 }])
   assert.deepEqual(calls, ['/load-stage?stage=input', '/entries?state=loaded', '/load-stage?stage=input-parsed'])
@@ -162,4 +162,21 @@ test('input parser capacity is distinguished from malformed data and HTTP failur
   await assert.rejects(readEntries('loaded'), { name: 'SyntaxError', message: 'Invalid JSON' })
   status = 500
   await assert.rejects(readEntries('loaded'), /Directory read: 500/)
+})
+
+
+test('streaming fixture parser preserves all entries at every byte boundary', async () => {
+  const { parseEntries } = await import('../web/read-entries.js')
+  const expected = Array.from({ length: 12 }, (_, i) => ({ name: fileName(i, 8), type: 7 }))
+  const bytes = new TextEncoder().encode(JSON.stringify(expected))
+  for (let split = 0; split <= bytes.length; split++) {
+    const response = { body: new ReadableStream({ start(controller) {
+      controller.enqueue(bytes.slice(0, split)); controller.enqueue(bytes.slice(split)); controller.close()
+    } }) }
+    assert.deepEqual(await parseEntries(response), expected)
+  }
+  assert.deepEqual(await parseEntries(new Response('[]')), [])
+  for (const invalid of ['[', '{}', '[{"name":"file-00000000.txt","type":7}', '[{"name":"other","type":7}]', '[{"name":"file-00000000.txt","type":7},]']) {
+    await assert.rejects(parseEntries(new Response(invalid)))
+  }
 })
