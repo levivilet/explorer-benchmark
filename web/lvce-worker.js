@@ -1,3 +1,4 @@
+import { readEntries } from './read-entries.js'
 // This host replaces editor services only. Tree algorithms and VDOM are unmodified upstream source.
 import { RendererWorker, IconThemeWorker } from '@lvce-editor/rpc-registry'
 import { commandMap } from '../.tmp/vendor/packages/explorer-view/src/parts/CommandMap/CommandMap.ts'
@@ -12,9 +13,7 @@ RendererWorker.set({ invoke: async (method, ...args) => {
     case 'FileSystem.isReadonly': return true
     case 'FileSystem.readDirWithFileTypes': {
       if (args[0] !== '/workspace') throw new Error(`Unexpected directory ${args[0]}`)
-      const response = await fetch(`/entries?state=${fixtureState}`)
-      if (!response.ok) throw new Error(`Directory read: ${response.status}`)
-      return await response.json()
+      return await readEntries(fixtureState)
     }
     default: throw new Error(`Unsupported host RPC: ${method}`)
   }

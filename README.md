@@ -6,7 +6,7 @@ Reproducible memory comparison of [LVCE explorer-view](https://github.com/lvce-e
 [Live results](https://levivilet.github.io/explorer-benchmark/) ·
 [Run benchmark](https://github.com/levivilet/explorer-benchmark/actions/workflows/benchmark.yml)
 
-The default workloads are **10,000, 100,000, 1,000,000 and 10,000,000 synthetic file entries, each workload representing one open directory**. All implementations
+The default workloads are **10,000, 100,000, 1,000,000, 10,000,000 and 100,000,000 synthetic file entries, each workload representing one open directory**. All implementations
 load the same prepared JSON directory listing, expose all entries in their tree model, and
 render the first, middle and last files on demand. Built-in virtualization remains enabled. The minimal Headless Tree DOM host and jsTree
 render all rows; no external virtualizer is added. DOM row counts expose this difference. Names are zero-padded to a width that keeps
@@ -26,7 +26,7 @@ npm run test:cdp
 npm run test:adapters              # Repeated virtualized scrolling regression
 npm run test:crash                 # Actual Chromium crash and recovery regression
 npm run fixture                  # Prepare all JSON fixtures outside the benchmark budget
-npm run benchmark                # 10k, 100k, 1m and 10m files; five fresh trials per component
+npm run benchmark                # 10k, 100k, 1m, 10m and 100m files; five fresh trials per component
 npm run report
 npm run test:report
 python3 -m http.server 8080 --directory .tmp/pages
@@ -53,9 +53,9 @@ npm run serve
 # In the console: await benchmark.load('loaded')
 ```
 
-Options: `--files` (comma-separated sizes, each 1–10,000,000), `--repeats`, `--samples`, `--seed`, `--output`, and `--implementation` (one of `lvce`, `pierre`, `arborist`, `headless`, `jstree`; defaults to all).
+Options: `--files` (comma-separated sizes, each 1–100,000,000), `--repeats`, `--samples`, `--seed`, `--output`, and `--implementation` (one of `lvce`, `pierre`, `arborist`, `headless`, `jstree`; defaults to all).
 The 100,000- and 1,000,000-file cases are required measurements, not guarantees that each
-component supports those sizes. The 10,000,000-file case records and publishes
+component supports those sizes. The 10,000,000- and 100,000,000-file cases record and publish
 a feasibility result when the bounded 15-minute benchmark attempt cannot complete. Fixture generation is a separate CI step and is excluded from that budget. Use
 different output directories when preserving runs. This measures frontend directory metadata handling; file contents and filesystem enumeration are outside its scope.
 
@@ -65,7 +65,7 @@ different output directories when preserving runs. This measures frontend direct
    file names (including the final newline) and record the count, name width, endpoints and JSON byte size in a completion manifest.
    Setup uses bounded memory and creates no individual files. A common loopback server streams the prepared JSON unchanged on each loaded request;
    it does not enumerate a directory, sort, or serialize entries during trials. Every adapter receives the same listing.
-   Benchmark execution reads the manifest and checks the JSON size; it never generates missing fixtures. Downloading and parsing JSON in the browser remain part of load readiness.
+   Benchmark execution reads the manifest and checks the JSON size; it never generates missing fixtures. Downloading and parsing JSON in the browser remain part of load readiness. Adapters parse streamed batches into the complete entry array, avoiding a second multi-gigabyte response string; no component sees a partial listing.
 2. Pin the LVCE source commit and download checksum in `config/sources.lock.json`. Pin all npm components,
    LVCE runtime dependencies, esbuild and Playwright in `package-lock.json`. Build production,
    minified bundles with the same bundler. Chromium is Playwright's matching revision.
@@ -172,12 +172,12 @@ This benchmark is maintained by LVCE and does not predetermine the winner.
 ## CI and evidence
 
 Pull requests, main pushes and manual dispatch run the full
-10,000-, 100,000-, 1,000,000- and 10,000,000-file / five-trial protocol on Ubuntu 24.04. Each implementation/file-count pair runs in its own job (20 parallel jobs, subject to runner availability),
+10,000-, 100,000-, 1,000,000-, 10,000,000- and 100,000,000-file / five-trial protocol on Ubuntu 24.04. Each implementation/file-count pair runs in its own job (25 parallel jobs, subject to runner availability),
 with fail-fast disabled. A final job downloads all shards, validates their complete trial inventory,
 source/fixture/dependency pins and protocol, then merges measurements and builds the report.
 Host metadata and original JSON remain available per job; trial order is randomized within each job,
 not globally across implementations. Missing jobs and harness failures still block publication.
-A 10M job that cannot run records host feasibility evidence without discarding other trees
+A 10M or 100M job that cannot run records host feasibility evidence without discarding other trees
 that completed that size. Unit tests cover fixture integrity,
 statistics and invalid-report rejection. A Chromium integration test verifies that
 worker allocations are included. Functional browser probes are part of every trial.
@@ -189,12 +189,12 @@ Each workload writes `results/<file-count>/results.json`. To run an individual s
 ```sh
 npm run fixture -- --files 100000
 npm run benchmark -- --implementation lvce --files 100000 --output shards/lvce-100000
-# After collecting all 20 shards under shards/:
+# After collecting all 25 shards under shards/:
 npm run merge
 npm run report
 ```
 
-The merge requires all five implementations at all four default sizes. Each run uploads raw JSON, all successful/failed screenshots and the standalone
+The merge requires all five implementations at all five default sizes. Each run uploads raw JSON, all successful/failed screenshots and the standalone
 HTML report as a 90-day artifact. Pages includes JSON and screenshot downloads.
 To update a source, change its exact version/commit and integrity pin together,
 regenerate the npm lock when appropriate, and review a fresh comparison.
@@ -204,3 +204,33 @@ References: [Pierre API](https://github.com/pierrecomputer/pierre/tree/main/pack
 [CDP heap accounting](https://chromedevtools.github.io/devtools-protocol/tot/Runtime/#method-getHeapUsage),
 [CDP forced GC](https://chromedevtools.github.io/devtools-protocol/tot/HeapProfiler/#method-collectGarbage),
 [Playwright CDP sessions](https://playwright.dev/docs/api/class-cdpsession).
+
+## 100-million-entry stress test
+
+The 100M workload uses the same full-load protocol for all five trees: a flat,
+synthetic listing from `file-00000000.txt` to `file-99999999.txt`, streamed in
+bounded batches to a 3,800,000,001-byte JSON file. It does not create 100M real
+files or replace the tree's input with a partial/lazy model. Allow at least 4 GB
+of free disk per shard for this fixture, in addition to dependencies and artifacts.
+Each CI shard has its own Ubuntu host and a 15-minute trial budget; five fresh
+trials are planned, with the same empty baseline and readiness/GC requirements.
+
+The original 100M CI experiment generated the complete fixture but all five trees
+encountered `TypeError: Failed to fetch` while consuming the monolithic JSON body.
+The input reader now parses streamed batches into a full array instead of asking
+Chromium to buffer and decode the entire response at once. Transport errors remain
+fatal; this does not reclassify a generic fetch error as a capacity result.
+
+At this size the full entry array itself may exceed browser capacity before
+a component receives its input. The adapters acknowledge `input` and `input-parsed`
+to the observer server, including from LVCE's worker. Crashes, load timeouts and
+explicit parser RangeErrors during `input` are labeled **Input/harness limit**,
+not evidence that the tree cannot hold 100M entries. After parsing, capacity
+failures apply to the component plus its adapter, not the standalone library.
+Malformed JSON, HTTP failures and other harness errors still fail CI. No failed
+trial gets a loaded-memory number. A whole-job timeout preserves checkpoints and
+reports host feasibility, rather than selecting the trials that happened to finish.
+Host RAM, browser version, fixture bytes/hash and per-trial failure stage are in
+the downloadable JSON; these bounded outcomes do not establish minimum RAM or
+promise success on larger hosts. A completed load must still pass first/middle/last
+visibility checks, including the browser's scrolling limits, before measurement.

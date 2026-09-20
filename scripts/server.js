@@ -6,6 +6,7 @@ import { loadFixture } from './fixture.js'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 export async function startServer(fixtureRoot, port = 0) {
+  const progress = { stage: 'idle' }
   const entriesPath = resolve(fixtureRoot, 'entries.json')
   const { size: jsonBytes } = await stat(entriesPath)
   const server = createServer(async (request, response) => {
@@ -14,6 +15,13 @@ export async function startServer(fixtureRoot, port = 0) {
       response.setHeader('Cache-Control', 'no-store')
       response.setHeader('Cross-Origin-Opener-Policy', 'same-origin')
       response.setHeader('Cross-Origin-Embedder-Policy', 'require-corp')
+      if (url.pathname === '/load-stage') {
+        const stage = url.searchParams.get('stage')
+        if (!['input', 'input-parsed'].includes(stage)) throw new Error('Invalid load stage')
+        progress.stage = stage
+        response.end('ok')
+        return
+      }
       if (url.pathname === '/entries') {
         if (!['empty', 'loaded'].includes(url.searchParams.get('state'))) throw new Error('Invalid state')
         response.setHeader('Content-Type', 'application/json')
@@ -37,7 +45,7 @@ export async function startServer(fixtureRoot, port = 0) {
     }
   })
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, '127.0.0.1', resolve) })
-  return { url: `http://127.0.0.1:${server.address().port}`, close: () => new Promise((resolve) => server.close(resolve)) }
+  return { progress, url: `http://127.0.0.1:${server.address().port}`, close: () => new Promise((resolve) => server.close(resolve)) }
 }
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   const { root } = await loadFixture(Number(process.argv[2] || '100000'))

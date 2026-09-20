@@ -57,14 +57,15 @@ export async function runTrial(trialInfo, { report, manifest, server, output, la
       await page.goto(`${server.url}/?implementation=${trial.implementation}`)
       await page.waitForFunction(() => Boolean(window.benchmark))
       for (phase of ['empty', 'loaded']) {
+        if (server.progress) server.progress.stage = 'idle'
         const start = performance.now()
         let state
         try {
           state = await evaluate((phase) => window.benchmark.load(phase), phase, report.protocol.loadTimeoutMs)
         } catch (error) {
-          if (phase !== 'loaded' || !error.message.startsWith('Component action timed out')) throw error
+          if (phase !== 'loaded' || (!error.message.startsWith('Component action timed out') && !error.message.includes('INPUT_CAPACITY:'))) throw error
           trial.status = 'unsupported'
-          trial.componentFailure = { message: error.message, type: 'load-timeout' }
+          trial.componentFailure = { message: error.message, type: error.message.includes('INPUT_CAPACITY:') ? 'input-capacity' : 'load-timeout' }
           return
         }
         if (state.componentFailure) {
@@ -122,6 +123,11 @@ export async function runTrial(trialInfo, { report, manifest, server, output, la
       console.error(trial.error)
     }
   } finally {
+    if (trial.componentFailure) {
+      trial.componentFailure.stage = server.progress?.stage ?? 'unknown'
+      trial.componentFailure.scope = trial.componentFailure.stage === 'input' ? 'input-harness' : 'component-or-adapter'
+      if (trial.componentFailure.scope === 'input-harness') trial.componentFailure.message = `Input/harness limit before the full listing reached the component: ${trial.componentFailure.message}`
+    }
     trial.consoleErrors = errors
     if (trial.status !== 'passed') await screenshot('failed')
     // Closing our browser disposes its sessions. Detach can hang during disconnection.

@@ -43,8 +43,10 @@ const checkpoint = async () => {
 }
 try {
   for (const trialInfo of order) {
+    report.trials.push({ ...trialInfo, status: 'running', phases: {} })
+    await checkpoint()
     const trial = await runTrial(trialInfo, { report, manifest, server, output })
-    report.trials.push(trial)
+    report.trials[report.trials.length - 1] = trial
     await checkpoint()
   }
 } finally { await server.close() }

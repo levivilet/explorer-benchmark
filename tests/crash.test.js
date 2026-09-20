@@ -7,10 +7,11 @@ import { join } from 'node:path'
 import { runTrial } from '../scripts/trial.js'
 
 async function attempt(output, scenario, repeat = 0) {
+  const server = { url: 'http://benchmark.test', progress: { stage: 'idle' } }
   return runTrial({ implementation: 'pierre', repeat }, {
     output, manifest: { count: 1 },
     report: { protocol: { viewport: { width: 800, height: 720 }, samples: 1, loadTimeoutMs: 10000, settleMs: 0, sampleIntervalMs: 0 } },
-    server: { url: 'http://benchmark.test' },
+    server,
     launchBrowser: async () => {
       const browser = await chromium.launch()
       if (scenario === 'disconnect with unresponsive CDP') {
@@ -39,7 +40,9 @@ async function attempt(output, scenario, repeat = 0) {
         const evaluate = page.evaluate.bind(page)
         page.evaluate = async (fn, argument) => {
           if (argument === (scenario === 'empty crash' ? 'empty' : 'loaded')) {
-            if (scenario === 'crash' || scenario === 'empty crash') {
+            if (scenario === 'input capacity') { server.progress.stage = 'input'; throw new Error('INPUT_CAPACITY: Invalid string length') }
+            if (scenario === 'input crash') server.progress.stage = 'input'
+            if (scenario === 'crash' || scenario === 'input crash' || scenario === 'empty crash') {
               const session = await page.context().newCDPSession(page)
               const crashed = page.waitForEvent('crash', { timeout: 10000 })
               void session.send('Page.crash').catch(() => {})
@@ -52,7 +55,7 @@ async function attempt(output, scenario, repeat = 0) {
           }
           return evaluate(fn, argument)
         }
-        if (scenario === 'component failure') page.screenshot = async () => { throw new Error('Screenshot unavailable') }
+        if (scenario === 'component failure' || scenario === 'input capacity') page.screenshot = async () => { throw new Error('Screenshot unavailable') }
         return page
       }
       return browser
@@ -60,7 +63,7 @@ async function attempt(output, scenario, repeat = 0) {
   })
 }
 
-for (const scenario of ['crash', 'disconnect', 'disconnect with unresponsive CDP', 'empty crash', 'rpc error', 'component failure']) {
+for (const scenario of ['crash', 'input crash', 'input capacity', 'disconnect', 'disconnect with unresponsive CDP', 'empty crash', 'rpc error', 'component failure']) {
   test(`trial recovery: ${scenario}`, { timeout: 20000 }, async () => {
     const output = await mkdtemp(join(tmpdir(), 'explorer-crash-'))
     try {
@@ -70,6 +73,10 @@ for (const scenario of ['crash', 'disconnect', 'disconnect with unresponsive CDP
         assert.equal(trial.componentFailure, undefined)
       } else {
         assert.equal(trial.status, 'unsupported')
+        if (scenario.startsWith('input')) {
+          assert.equal(trial.componentFailure.scope, 'input-harness')
+          assert.match(trial.componentFailure.message, /before the full listing reached the component/)
+        }
         if (scenario === 'crash') assert.equal(trial.componentFailure.type, 'target-crash')
         assert(trial.phases.empty.usedSize.median > 0)
         assert.equal(trial.deltaUsedSize, undefined)
