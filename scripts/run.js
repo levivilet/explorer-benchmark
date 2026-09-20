@@ -20,9 +20,9 @@ await writeFile(`${values.output}/manifest.json`, JSON.stringify(manifest, null,
 let failed = false
 for (const workload of manifest.workloads) {
   const { count } = workload
-  const timeoutMs = count === 10_000_000 ? 15 * 60 * 1000 : undefined
+  const timeoutMs = count >= 10_000_000 ? 15 * 60 * 1000 : undefined
   const result = spawnSync(process.execPath, ['scripts/benchmark.js', ...(values.implementation ? ['--implementation', values.implementation] : []), '--files', String(count), '--repeats', values.repeats, '--samples', values.samples, '--seed', values.seed, '--output', `${values.output}/${count}`], { stdio: 'inherit', timeout: timeoutMs })
-  if (count === 10_000_000 && result.error?.code === 'ETIMEDOUT') {
+  if (count >= 10_000_000 && result.error?.code === 'ETIMEDOUT') {
     const feasibility = {
       schemaVersion: 1,
       status: 'infeasible',

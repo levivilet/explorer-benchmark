@@ -54,7 +54,7 @@ export function renderChart(groups) {
     const y = 35 + i * 85
     const label = `<text x="0" y="${y + 22}" fill="currentColor" font-size="14">${labels[key]}</text>`
     if (group.unavailable) return `${label}<text x="235" y="${y + 22}" fill="#ffbe85">Workload infeasible — no memory result</text>`
-    if (group.failures) return `${label}<text x="235" y="${y + 22}" fill="#ffbe85">Not supported (${group.failures}/${group.repeats}) — no memory result</text>`
+    if (group.failures) return `${label}<text x="235" y="${y + 22}" fill="#ffbe85">Load failed (${group.failures}/${group.repeats}) — no memory result</text>`
     const x = (value) => 235 + value / max * 430
     const fill = key === 'lvce' ? '#4db9aa' : '#c982de'
     return `${label}<rect x="235" y="${y}" width="${x(group.loaded.median) - 235}" height="32" rx="3" fill="${fill}"/><path d="M${x(group.loaded.min)},${y + 16}H${x(group.loaded.max)}" stroke="white" stroke-width="3"/><text x="${x(group.loaded.median) + 12}" y="${y + 53}" fill="currentColor">${mib(group.loaded.median)} MiB</text>`
@@ -64,7 +64,7 @@ export function renderTable(groups) {
   const rows = Object.entries(sortGroups(groups)).map(([key, group]) => group.unavailable
     ? `<tr><th>${labels[key]}</th><td colspan="4" class="failure">Workload infeasible: ${group.messages.map(escape).join('; ')}</td></tr>`
     : group.failures
-    ? `<tr><th>${labels[key]}</th><td colspan="4" class="failure">${group.failures}/${group.repeats} trials not supported: ${group.messages.map(escape).join('; ')}</td></tr>`
+    ? `<tr><th>${labels[key]}</th><td colspan="4" class="failure">${group.failures}/${group.repeats} loads failed: ${group.messages.map(escape).join('; ')}</td></tr>`
     : `<tr><th>${labels[key]}</th><td>${mib(group.empty.median)}</td><td>${mib(group.loaded.median)}</td><td>${mib(group.loaded.min)}–${mib(group.loaded.max)}</td><td>${mib(group.delta.median)}</td></tr>`).join('')
   return `<div class="scroll"><table><caption>MiB (1,048,576 bytes). Medians across independent trials; range of trial medians.</caption><thead><tr><th>Implementation</th><th>Empty</th><th>Loaded</th><th>Loaded range</th><th>Paired increase</th></tr></thead><tbody>${rows}</tbody></table></div>`
 }

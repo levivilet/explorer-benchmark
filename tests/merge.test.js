@@ -90,3 +90,25 @@ test('all infeasible 10M jobs produce workload evidence with every host result',
   assert.deepEqual(Object.keys(result.components), implementations)
   assert.equal(JSON.parse(await readFile(`${output}/manifest.json`)).workloads[0].status, 'infeasible')
 })
+
+for (const all of [false, true]) {
+  test(`100M timeout checkpoints preserve every component (all infeasible: ${all})`, async (t) => {
+    const { source, output, files } = await fixture(t, 100000000)
+    for (const id of all ? implementations : ['pierre']) {
+      await edit(`${source}/${id}/manifest.json`, (manifest) => { manifest.workloads[0].status = 'infeasible' })
+      await edit(`${source}/${id}/${files}/results.json`, (report) => { report.trials[0].status = 'running' })
+      await writeJson(`${source}/${id}/${files}/feasibility.json`, { files, status: 'infeasible', code: 'BENCHMARK_TIMEOUT', reason: '15-minute host budget exhausted; component capacity unknown', details: { timeoutMs: 900000, partialResults: true } })
+    }
+    await mergeResults(source, output, [files])
+    if (all) {
+      const result = JSON.parse(await readFile(`${output}/${files}/feasibility.json`))
+      assert.deepEqual(Object.keys(result.components), implementations)
+    } else {
+      const report = JSON.parse(await readFile(`${output}/${files}/results.json`))
+      assert.equal(aggregate(report).pierre.loaded, undefined)
+      assert.equal(aggregate(report).lvce.loaded.median, 3)
+    }
+    const checkpoint = JSON.parse(await readFile(`${output}/${files}/shards/pierre/results.json`))
+    assert.equal(checkpoint.trials[0].status, 'running')
+  })
+}

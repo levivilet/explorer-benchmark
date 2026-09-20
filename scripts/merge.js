@@ -1,13 +1,14 @@
 import assert from 'node:assert/strict'
 import { cp, mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
+import { DEFAULT_FILES } from './fixture.js'
 import { implementations } from './implementations.js'
 import { aggregate } from './report.js'
 
 const readJson = async (path) => JSON.parse(await readFile(path, 'utf8'))
 const writeJson = async (path, value) => writeFile(path, JSON.stringify(value, null, 2) + '\n')
 
-export async function mergeResults(source = 'shards', destination = 'results', files = [10000, 100000, 1000000, 10000000]) {
+export async function mergeResults(source = 'shards', destination = 'results', files = DEFAULT_FILES.split(',').map(Number)) {
   const shards = []
   for (const name of await readdir(source)) {
     const directory = `${source}/${name}`
@@ -41,7 +42,7 @@ export async function mergeResults(source = 'shards', destination = 'results', f
       const input = `${shard.directory}/${count}`
       await cp(input, `${directory}/shards/${implementation}`, { recursive: true })
       if (workload.status === 'infeasible') {
-        assert.equal(count, 10000000, 'Only the optional 10M workload may be infeasible')
+        assert([10000000, 100000000].includes(count), 'Only 10M and 100M stress workloads may be infeasible')
         const feasibility = await readJson(`${input}/feasibility.json`)
         assert.equal(feasibility.files, count)
         assert.equal(feasibility.status, 'infeasible')

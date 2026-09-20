@@ -1,3 +1,4 @@
+import { readEntries } from './read-entries.js'
 import { createTree, syncDataLoaderFeature } from '@headless-tree/core'
 
 const applyProps = (element, props) => {
@@ -12,9 +13,7 @@ export async function mount(container) {
   container.style.overflow = 'auto'
   return {
     async load(state) {
-      const response = await fetch(`/entries?state=${state}`)
-      if (!response.ok) throw new Error(`Directory read: ${response.status}`)
-      const ids = (await response.json()).map(({ name }) => name)
+      const ids = (await readEntries(state)).map(({ name }) => name)
       if (tree) {
         for (const item of tree.getItems()) item.registerElement(null)
         tree.registerElement(null)

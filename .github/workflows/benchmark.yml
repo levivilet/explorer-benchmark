@@ -45,7 +45,7 @@ jobs:
       fail-fast: false
       matrix:
         implementation: [lvce, pierre, arborist, headless, jstree]
-        files: [10000, 100000, 1000000, 10000000]
+        files: [10000, 100000, 1000000, 10000000, 100000000]
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5

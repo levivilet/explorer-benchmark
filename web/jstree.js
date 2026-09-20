@@ -1,3 +1,4 @@
+import { readEntries } from './read-entries.js'
 import $ from 'jquery'
 import 'jstree'
 
@@ -6,9 +7,7 @@ export async function mount(container) {
   container.style.overflow = 'auto'
   return {
     async load(state) {
-      const response = await fetch(`/entries?state=${state}`)
-      if (!response.ok) throw new Error(`Directory read: ${response.status}`)
-      const data = (await response.json()).map(({ name }) => ({ id: name, text: name, icon: false }))
+      const data = (await readEntries(state)).map(({ name }) => ({ id: name, text: name, icon: false }))
       tree?.destroy()
       await new Promise((resolve, reject) => {
         $(container).one('ready.jstree', resolve).jstree({ core: {

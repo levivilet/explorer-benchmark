@@ -5,8 +5,8 @@ import { resolve } from 'node:path'
 import { pipeline } from 'node:stream/promises'
 import { pathToFileURL } from 'node:url'
 
-export const MAX_FIXTURE_FILES = 10_000_000
-export const DEFAULT_FILES = '10000,100000,1000000,10000000'
+export const MAX_FIXTURE_FILES = 100_000_000
+export const DEFAULT_FILES = '10000,100000,1000000,10000000,100000000'
 const fixtureBase = '.tmp/fixtures-json'
 export const fileNameWidth = (count) => Math.max(6, String(count - 1).length)
 export const fileName = (index, width = 6) => `file-${String(index).padStart(width, '0')}.txt`
