@@ -4,23 +4,24 @@ import { mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { pipeline } from 'node:stream/promises'
 import { pathToFileURL } from 'node:url'
+import type { FixtureManifest } from './types.ts'
 
 export const MAX_FIXTURE_FILES = 100_000_000
 export const DEFAULT_FILES = '10000,100000,1000000,10000000,100000000'
 const fixtureBase = '.tmp/fixtures-json'
-export const fileNameWidth = (count) => Math.max(6, String(count - 1).length)
-export const fileName = (index, width = 6) => `file-${String(index).padStart(width, '0')}.txt`
-export const digestNames = (names) => createHash('sha256').update(names.join('\n') + '\n').digest('hex')
-export const positiveInteger = (value, name) => {
+export const fileNameWidth = (count: number): number => Math.max(6, String(count - 1).length)
+export const fileName = (index: number, width = 6): string => `file-${String(index).padStart(width, '0')}.txt`
+export const digestNames = (names: string[]): string => createHash('sha256').update(names.join('\n') + '\n').digest('hex')
+export const positiveInteger = (value: string | number, name: string): number => {
   const number = Number(value)
   if (!Number.isSafeInteger(number) || number < 1) throw new Error(`${name} must be a positive integer`)
   return number
 }
-const validateCount = (count) => {
+const validateCount = (count: number): void => {
   positiveInteger(count, 'files')
   if (count > MAX_FIXTURE_FILES) throw new Error(`Maximum fixture size is ${MAX_FIXTURE_FILES.toLocaleString('en-US')} files`)
 }
-export async function createFixture(count = 100000, base = fixtureBase) {
+export async function createFixture(count = 100000, base = fixtureBase): Promise<{ root: string; manifest: FixtureManifest }> {
   validateCount(count)
   const root = resolve(base, String(count))
   const width = fileNameWidth(count)
@@ -47,12 +48,12 @@ export async function createFixture(count = 100000, base = fixtureBase) {
   await pipeline(chunks(), createWriteStream(`${root}/entries.json.tmp`))
   await rename(`${root}/entries.json.tmp`, `${root}/entries.json`)
   const { size: jsonBytes } = await stat(`${root}/entries.json`)
-  const manifest = { count, shape: 'flat', source: 'synthetic-json', fileBytes: 0, nameWidth: width, first: fileName(0, width), last: fileName(count - 1, width), sha256: hash.digest('hex'), jsonBytes }
+  const manifest: FixtureManifest = { count, shape: 'flat', source: 'synthetic-json', fileBytes: 0, nameWidth: width, first: fileName(0, width), last: fileName(count - 1, width), sha256: hash.digest('hex'), jsonBytes }
   await writeFile(`${root}/manifest.json.tmp`, JSON.stringify(manifest, null, 2) + '\n')
   await rename(`${root}/manifest.json.tmp`, `${root}/manifest.json`)
   return { root, manifest }
 }
-export async function loadFixture(count, base = fixtureBase) {
+export async function loadFixture(count: number, base = fixtureBase): Promise<{ root: string; manifest: FixtureManifest }> {
   validateCount(count)
   const root = resolve(base, String(count))
   let manifest

@@ -40,7 +40,7 @@ Setup writes only the JSON fixtures and manifests in `.tmp/fixtures-json`; it do
 # Quick adapter/CDP smoke; explicitly labeled as too few trials for comparison:
 npm run fixture -- --files 1000
 npm run benchmark -- --files 1000 --repeats 1 --samples 1 --output results-smoke
-node scripts/report-all.js results-smoke .tmp/smoke-pages
+node scripts/report-all.ts results-smoke .tmp/smoke-pages
 
 # Open the components manually after generating/building:
 npm run fixture -- --files 100000

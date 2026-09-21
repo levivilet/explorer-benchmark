@@ -6,10 +6,10 @@ const locations = [
   'package.json',
   'package-lock.json',
   '.github/workflows/benchmark.yml',
-  'scripts/compute-node-modules-cache-key.js',
+  'scripts/compute-node-modules-cache-key.ts',
 ]
 
-const computeHash = (contents) => {
+const computeHash = (contents: string[]): string => {
   const hash = createHash('sha1')
   for (const content of contents) {
     hash.update(content)

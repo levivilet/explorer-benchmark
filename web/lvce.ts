@@ -1,8 +1,20 @@
 import { renderInto } from '@lvce-editor/virtual-dom'
-export async function mount(container) {
+import type { Adapter, LoadState, LoadResult } from './types.ts'
+
+interface WorkerResult extends LoadResult {
+  dom: unknown
+}
+
+interface PendingRequest {
+  resolve: (value: WorkerResult) => void
+  reject: (reason?: unknown) => void
+  timer: ReturnType<typeof setTimeout>
+}
+
+export async function mount(container: HTMLElement): Promise<Adapter> {
   const worker = new Worker('/lvce-worker.js', { type: 'module' })
   let nextId = 0
-  const pending = new Map()
+  const pending = new Map<number, PendingRequest>()
   worker.onmessage = ({ data }) => {
     const request = pending.get(data.id)
     if (!request) return
@@ -15,13 +27,13 @@ export async function mount(container) {
     for (const { reject, timer } of pending.values()) { clearTimeout(timer); reject(new Error(event.message)) }
     pending.clear()
   }
-  const invoke = (action, value) => new Promise((resolve, reject) => {
+  const invoke = (action: 'load' | 'scroll', value: LoadState | number): Promise<WorkerResult> => new Promise((resolve, reject) => {
     const id = ++nextId
     const timer = setTimeout(() => { pending.delete(id); reject(new Error(`Worker timeout: ${action}`)) }, 90000)
     pending.set(id, { resolve, reject, timer })
     worker.postMessage({ id, action, value })
   })
-  const update = async (action, value) => {
+  const update = async (action: 'load' | 'scroll', value: LoadState | number): Promise<LoadResult> => {
     const result = await invoke(action, value)
     if (result.componentFailure) {
       container.textContent = `Explorer failed to load: ${result.componentFailure.message}`
@@ -33,12 +45,12 @@ export async function mount(container) {
     return { count, first, last }
   }
   let position = 0
-  let queue = Promise.resolve()
-  const scroll = (index) => {
+  let queue: Promise<unknown> = Promise.resolve()
+  const scroll = (index: number): Promise<unknown> => {
     position = Math.max(0, index)
     queue = queue.then(() => update('scroll', position))
     return queue
   }
   container.addEventListener('wheel', (event) => { event.preventDefault(); void scroll(position + Math.sign(event.deltaY) * 3) }, { passive: false })
-  return { load: (state) => update('load', state), scroll }
+  return { load: (state: LoadState) => update('load', state), scroll }
 }

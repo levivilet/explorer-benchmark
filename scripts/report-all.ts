@@ -1,14 +1,15 @@
 import { cp, mkdir, readFile, writeFile } from 'node:fs/promises'
-import { buildReport, renderChart, renderFeasibility, renderTable, style } from './report.js'
+import { buildReport, renderChart, renderFeasibility, renderTable, style } from './report.ts'
+import type { BenchmarkReport, Feasibility, Implementation, ReportGroup } from './types.ts'
 const source = process.argv[2] || 'results'
 const destination = process.argv[3] || '.tmp/pages'
-const manifest = JSON.parse(await readFile(`${source}/manifest.json`, 'utf8'))
+const manifest = JSON.parse(await readFile(`${source}/manifest.json`, 'utf8')) as { status: string; files: number[]; workloads?: Array<{ count: number; status: string }> }
 if (manifest.status !== 'complete') throw new Error('Benchmark matrix incomplete or invalid')
 if (manifest.workloads && (!Array.isArray(manifest.workloads) || manifest.workloads.length !== manifest.files.length || manifest.workloads.some(({ count, status }) => !manifest.files.includes(count) || !['complete', 'infeasible'].includes(status)))) throw new Error('Benchmark workload inventory incomplete or invalid')
-const runs = []
+const runs: Array<{ kind: 'feasibility'; feasibility: Feasibility } | { kind: 'benchmark'; report: BenchmarkReport; groups: Record<Implementation, ReportGroup> }> = []
 for (const count of manifest.files) {
-  let feasibility
-  try { feasibility = JSON.parse(await readFile(`${source}/${count}/feasibility.json`, 'utf8')) } catch (error) { if (error.code !== 'ENOENT') throw error }
+  let feasibility: Feasibility | undefined
+  try { feasibility = JSON.parse(await readFile(`${source}/${count}/feasibility.json`, 'utf8')) as Feasibility } catch (error) { if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error }
   if (feasibility) {
     if (feasibility.status !== 'infeasible') throw new Error(`Invalid feasibility result for ${count}`)
     await mkdir(`${destination}/${count}/evidence`, { recursive: true })

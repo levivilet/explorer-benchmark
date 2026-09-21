@@ -9,7 +9,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 test('deadline SIGTERM exits the runner and kills its Chromium process', { timeout: 15000 }, async () => {
   const child = spawn(process.execPath, ['--input-type=module', '-e', `
     import { chromium } from 'playwright';
-    import { exitOnTermination } from './scripts/termination.js';
+    import { exitOnTermination } from './scripts/termination.ts';
     exitOnTermination();
     const browser = await chromium.launch();
     const root = await browser.newBrowserCDPSession();

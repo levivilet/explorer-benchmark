@@ -1,18 +1,20 @@
-import { readEntries } from './read-entries.js'
+import { readEntries } from './read-entries.ts'
 import { createTree, syncDataLoaderFeature } from '@headless-tree/core'
+import type { TreeInstance } from '@headless-tree/core'
+import type { Adapter, LoadState } from './types.ts'
 
-const applyProps = (element, props) => {
+const applyProps = (element: HTMLElement, props: Record<string, unknown>): void => {
   for (const [key, value] of Object.entries(props)) {
-    if (key === 'ref') value(element)
-    else if (key.startsWith('on')) element.addEventListener(key.slice(2).toLowerCase(), value)
-    else if (value !== undefined) element.setAttribute(key, value)
+    if (key === 'ref' && typeof value === 'function') value(element)
+    else if (key.startsWith('on') && typeof value === 'function') element.addEventListener(key.slice(2).toLowerCase(), value as EventListener)
+    else if (value !== undefined && value !== null) element.setAttribute(key, String(value))
   }
 }
-export async function mount(container) {
-  let tree
+export async function mount(container: HTMLElement): Promise<Adapter> {
+  let tree: TreeInstance<string> | undefined
   container.style.overflow = 'auto'
   return {
-    async load(state) {
+    async load(state: LoadState) {
       const ids = (await readEntries(state)).map(({ name }) => name)
       if (tree) {
         for (const item of tree.getItems()) item.registerElement(null)
@@ -42,7 +44,8 @@ export async function mount(container) {
       container.append(content)
       return { count: items.length, first: items[0]?.getItemName(), last: items.at(-1)?.getItemName() }
     },
-    async scroll(index) {
+    async scroll(index: number) {
+      if (!tree) throw new Error('Headless Tree did not initialize')
       const item = tree.getItems()[index]
       if (!item) throw new Error(`Missing Headless Tree item ${index}`)
       await item.scrollTo({ block: 'start' })
