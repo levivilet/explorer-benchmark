@@ -2,30 +2,35 @@ import { createServer } from 'node:http'
 import { readFile, stat } from 'node:fs/promises'
 import { createReadStream } from 'node:fs'
 import { pipeline } from 'node:stream/promises'
-import { loadFixture } from './fixture.js'
+import { loadFixture } from './fixture.ts'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
-export async function startServer(fixtureRoot, port = 0) {
+import type { IncomingMessage, ServerResponse } from 'node:http'
+import type { AddressInfo } from 'node:net'
+import type { BenchmarkServer } from './types.ts'
+
+export async function startServer(fixtureRoot: string, port = 0): Promise<BenchmarkServer> {
   const progress = { stage: 'idle' }
   const entriesPath = resolve(fixtureRoot, 'entries.json')
   const { size: jsonBytes } = await stat(entriesPath)
-  const server = createServer(async (request, response) => {
+  const server = createServer(async (request: IncomingMessage, response: ServerResponse) => {
     try {
-      const url = new URL(request.url, 'http://localhost')
+      const url = new URL(request.url ?? '/', 'http://localhost')
       response.setHeader('Cache-Control', 'no-store')
       response.setHeader('Cross-Origin-Opener-Policy', 'same-origin')
       response.setHeader('Cross-Origin-Embedder-Policy', 'require-corp')
       if (url.pathname === '/load-stage') {
         const stage = url.searchParams.get('stage')
-        if (!['input', 'input-parsed'].includes(stage)) throw new Error('Invalid load stage')
+        if (stage !== 'input' && stage !== 'input-parsed') throw new Error('Invalid load stage')
         progress.stage = stage
         response.end('ok')
         return
       }
       if (url.pathname === '/entries') {
-        if (!['empty', 'loaded'].includes(url.searchParams.get('state'))) throw new Error('Invalid state')
+        const state = url.searchParams.get('state')
+        if (state !== 'empty' && state !== 'loaded') throw new Error('Invalid state')
         response.setHeader('Content-Type', 'application/json')
-        if (url.searchParams.get('state') === 'empty') {
+        if (state === 'empty') {
           response.end('[]')
         } else {
           response.setHeader('Content-Length', jsonBytes)
@@ -44,10 +49,11 @@ export async function startServer(fixtureRoot, port = 0) {
       else response.destroy()
     }
   })
-  await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, '127.0.0.1', resolve) })
-  return { progress, url: `http://127.0.0.1:${server.address().port}`, close: () => new Promise((resolve) => server.close(resolve)) }
+  await new Promise<void>((resolve, reject) => { server.once('error', reject); server.listen(port, '127.0.0.1', resolve) })
+  const address = server.address() as AddressInfo
+  return { progress, url: `http://127.0.0.1:${address.port}`, close: () => new Promise<void>((resolve) => server.close(() => resolve())) }
 }
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const { root } = await loadFixture(Number(process.argv[2] || '100000'))
   const server = await startServer(root, 4173)
   console.log(`${server.url}/?implementation=lvce and ?implementation=pierre`)

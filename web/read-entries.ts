@@ -1,13 +1,16 @@
 // The fixture is a JSON array of flat {name,type} records. Parse complete batches
 // while retaining the full entry array, without also retaining a multi-GB string.
-export async function parseEntries(response) {
+import type { Entry, LoadState } from './types.ts'
+
+export async function parseEntries(response: Response): Promise<Entry[]> {
+  if (!response.body) throw new Error('Missing fixture response body')
   const reader = response.body.getReader()
   const decoder = new TextDecoder('utf-8', { fatal: true })
-  const entries = []
+  const entries: Entry[] = []
   let pending = ''
   let started = false
-  const append = (json) => {
-    for (const entry of JSON.parse(`[${json}]`)) {
+  const append = (json: string): void => {
+    for (const entry of JSON.parse(`[${json}]`) as Entry[]) {
       if (!/^file-[0-9]+\.txt$/.test(entry.name) || entry.type !== 7) throw new Error('Invalid fixture entry')
       entries.push(entry)
     }
@@ -36,8 +39,8 @@ export async function parseEntries(response) {
 }
 
 // Progress lives in the observer server so it survives a page or worker crash.
-export async function readEntries(state) {
-  const mark = async (stage) => {
+export async function readEntries(state: LoadState): Promise<Entry[]> {
+  const mark = async (stage: 'input' | 'input-parsed'): Promise<void> => {
     const response = await fetch(`/load-stage?stage=${stage}`)
     if (!response.ok) throw new Error(`Load progress: ${response.status}`)
   }

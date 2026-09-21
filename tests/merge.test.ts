@@ -3,9 +3,9 @@ import assert from 'node:assert/strict'
 import { mkdtemp, mkdir, readFile, rm, writeFile, cp } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { mergeResults } from '../scripts/merge.js'
-import { implementations } from '../scripts/implementations.js'
-import { aggregate, buildReport } from '../scripts/report.js'
+import { mergeResults } from '../scripts/merge.ts'
+import { implementations } from '../scripts/implementations.ts'
+import { aggregate, buildReport } from '../scripts/report.ts'
 
 const writeJson = async (path, value) => writeFile(path, JSON.stringify(value))
 async function fixture(t, files = 100000) {

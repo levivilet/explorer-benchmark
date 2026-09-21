@@ -1,11 +1,15 @@
-import { readEntries } from './read-entries.js'
+import { readEntries } from './read-entries.ts'
+import type { Entry, LoadState } from './types.ts'
 // This host replaces editor services only. Tree algorithms and VDOM are unmodified upstream source.
 import { RendererWorker, IconThemeWorker } from '@lvce-editor/rpc-registry'
+// The downloaded LVCE source is intentionally kept outside the checked-in TypeScript project.
+// @ts-expect-error The source is materialized by `npm run setup` before browser bundling.
 import { commandMap } from '../.tmp/vendor/packages/explorer-view/src/parts/CommandMap/CommandMap.ts'
+// @ts-expect-error The source is materialized by `npm run setup` before browser bundling.
 import { getComponentState } from '../.tmp/vendor/packages/explorer-view/src/parts/GetComponentState/GetComponentState.ts'
-let fixtureState = 'empty'
-let hostFailure
-RendererWorker.set({ invoke: async (method, ...args) => {
+let fixtureState: LoadState = 'empty'
+let hostFailure: Error | undefined
+;(RendererWorker as any).set({ invoke: async (method: string, ...args: any[]) => {
   try {
   switch (method) {
     case 'Preferences.get': return args[0] === 'files.exclude' ? {} : false
@@ -17,9 +21,9 @@ RendererWorker.set({ invoke: async (method, ...args) => {
     }
     default: throw new Error(`Unsupported host RPC: ${method}`)
   }
-  } catch (error) { hostFailure = error; throw error }
+  } catch (error) { hostFailure = error instanceof Error ? error : new Error(String(error)); throw error }
 }})
-IconThemeWorker.set({ invoke: async (method, requests) => {
+;(IconThemeWorker as any).set({ invoke: async (method: string, requests: unknown[]) => {
   if (!method.endsWith('getIcons')) throw new Error(`Unsupported icon RPC: ${method}`)
   return requests.map(() => '/file.svg')
 }})
@@ -28,7 +32,7 @@ commandMap['Explorer.create'](uid, '', 0, 0, 480, 600, {}, 0)
 self.onmessage = async ({ data: { id, action, value } }) => {
   try {
     if (action === 'load') {
-      fixtureState = value
+      fixtureState = value as LoadState
       await commandMap['Explorer.loadContent'](uid)
     } else if (action === 'scroll') {
       const state = getComponentState(uid)
@@ -45,5 +49,5 @@ self.onmessage = async ({ data: { id, action, value } }) => {
     await commandMap['Explorer.render2'](uid)
     const dom = commandMap['Explorer.getComponentDom'](uid)
     self.postMessage({ id, value: { dom, count: state.items.length, first: state.items[0]?.name, last: state.items.at(-1)?.name } })
-  } catch (error) { self.postMessage({ id, error: error.stack || String(error) }) }
+  } catch (error) { self.postMessage({ id, error: error instanceof Error ? error.stack || error.message : String(error) }) }
 }

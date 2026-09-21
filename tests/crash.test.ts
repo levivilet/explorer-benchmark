@@ -4,7 +4,7 @@ import { chromium } from 'playwright'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { runTrial } from '../scripts/trial.js'
+import { runTrial } from '../scripts/trial.ts'
 
 async function attempt(output, scenario, repeat = 0) {
   const server = { url: 'http://benchmark.test', progress: { stage: 'idle' } }

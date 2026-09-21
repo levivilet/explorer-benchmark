@@ -1,6 +1,6 @@
 import { chromium } from 'playwright'
 import assert from 'node:assert/strict'
-import { measureHeaps } from './cdp.js'
+import { measureHeaps } from './cdp.ts'
 const browser = await chromium.launch()
 try {
   const page = await browser.newPage()
@@ -10,7 +10,8 @@ try {
     const blob = new Blob(['self.values = new Array(1000000).fill(123.5); self.postMessage("ready")'], { type: 'text/javascript' })
     const url = URL.createObjectURL(blob)
     window.worker = new Worker(url)
-    await new Promise((resolve, reject) => { window.worker.onmessage = resolve; window.worker.onerror = reject })
+    const worker = window.worker
+    await new Promise((resolve, reject) => { worker!.onmessage = resolve; worker!.onerror = reject })
     URL.revokeObjectURL(url)
   })
   const loaded = await measureHeaps(browser, true)

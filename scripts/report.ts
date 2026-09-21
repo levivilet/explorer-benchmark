@@ -1,16 +1,18 @@
-import { implementations, labels } from './implementations.js'
-export { labels } from './implementations.js'
+import { implementations, labels } from './implementations.ts'
+export { labels } from './implementations.ts'
 import { access, mkdir, readFile, writeFile, cp } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
-import { summary } from './statistics.js'
-export function aggregate(report) {
+import { summary } from './statistics.ts'
+import type { BenchmarkReport, Feasibility, Implementation, ReportGroup } from './types.ts'
+
+export function aggregate(report: BenchmarkReport): Record<Implementation, ReportGroup> {
   const { repeats } = report.protocol
   const inventory = report.protocol.implementations ?? ['lvce', 'pierre']
   if (!Array.isArray(inventory) || !inventory.length || new Set(inventory).size !== inventory.length || inventory.some((id) => !implementations.includes(id))) throw new Error('Invalid implementation inventory')
   const unavailable = report.unavailable ?? {}
-  if (Object.entries(unavailable).some(([id, evidence]) => !inventory.includes(id) || evidence.status !== 'infeasible' || !evidence.reason)) throw new Error('Invalid unavailable component evidence')
+  if (Object.entries(unavailable).some(([id, evidence]) => !inventory.includes(id as Implementation) || evidence?.status !== 'infeasible' || !evidence?.reason)) throw new Error('Invalid unavailable component evidence')
   if (!Number.isSafeInteger(repeats) || repeats < 1 || report.trials.length !== repeats * (inventory.length - Object.keys(unavailable).length)) throw new Error('Incomplete trial inventory')
-  const groups = {}
+  const groups = {} as Record<Implementation, ReportGroup>
   for (const implementation of inventory) {
     if (unavailable[implementation]) {
       if (report.trials.some((trial) => trial.implementation === implementation)) throw new Error('Unavailable component has aggregate trials')
@@ -22,54 +24,58 @@ export function aggregate(report) {
     if (trials.some((trial) => !['passed', 'unsupported'].includes(trial.status))) throw new Error('Failed trials cannot produce a comparison')
     if (trials.some((trial) => trial.status === 'unsupported' && !trial.componentFailure?.message)) throw new Error('Missing component failure evidence')
     const failures = trials.filter((trial) => trial.status === 'unsupported')
-    const group = { failures: failures.length, repeats, messages: [...new Set(failures.map((trial) => trial.componentFailure.message))] }
+    const group: ReportGroup = { failures: failures.length, repeats, messages: [...new Set(failures.map((trial) => trial.componentFailure!.message))] }
     // Do not select only successful attempts when a component sometimes fails.
     if (failures.length === 0) {
-      for (const phase of ['empty', 'loaded']) group[phase] = summary(trials.map((trial) => trial.phases[phase].usedSize.median))
-      group.delta = summary(trials.map((trial) => trial.deltaUsedSize))
+      for (const phase of ['empty', 'loaded'] as const) group[phase] = summary(trials.map((trial) => trial.phases[phase]!.usedSize.median))
+      group.delta = summary(trials.map((trial) => trial.deltaUsedSize!))
     }
     groups[implementation] = group
   }
   return sortGroups(groups)
 }
-export function sortGroups(groups) {
+export function sortGroups(groups: Record<Implementation, ReportGroup>): Record<Implementation, ReportGroup> {
   const entries = Object.entries(groups).map(([key, group], index) => ({ key, group, index }))
   entries.sort((left, right) => {
     const leftHasResult = Boolean(left.group.loaded)
     const rightHasResult = Boolean(right.group.loaded)
     if (leftHasResult !== rightHasResult) return leftHasResult ? -1 : 1
     if (!leftHasResult) return left.index - right.index
-    return left.group.loaded.median - right.group.loaded.median || left.index - right.index
+    return left.group.loaded!.median - right.group.loaded!.median || left.index - right.index
   })
-  return Object.fromEntries(entries.map(({ key, group }) => [key, group]))
+  return Object.fromEntries(entries.map(({ key, group }) => [key, group])) as Record<Implementation, ReportGroup>
 }
-export const escape = (text) => String(text).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char])
-export const mib = (bytes) => (bytes / 1048576).toFixed(2)
-export const renderFeasibility = (feasibility) => `<div class="failure"><p><strong>${feasibility.files.toLocaleString('en-US')}-file workload was infeasible on the benchmark host.</strong> ${escape(feasibility.reason)}</p><p>${feasibility.details.availableInodes ? `Available filesystem inodes: <code>${escape(feasibility.details.availableInodes)}</code>; required: <code>${escape(feasibility.details.requiredInodes)}</code>.` : `The workload left partial results: <code>${escape(feasibility.details.partialResults)}</code>; timeout: <code>${escape(feasibility.details.timeoutMs)} ms</code>.`} No complete component comparison was published.</p></div>`
+export const escape = (text: unknown): string => String(text).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char] ?? char)
+export const mib = (bytes: number): string => (bytes / 1048576).toFixed(2)
+export const renderFeasibility = (feasibility: Feasibility): string => `<div class="failure"><p><strong>${feasibility.files.toLocaleString('en-US')}-file workload was infeasible on the benchmark host.</strong> ${escape(feasibility.reason)}</p><p>${feasibility.details.availableInodes ? `Available filesystem inodes: <code>${escape(feasibility.details.availableInodes)}</code>; required: <code>${escape(feasibility.details.requiredInodes)}</code>.` : `The workload left partial results: <code>${escape(feasibility.details.partialResults)}</code>; timeout: <code>${escape(feasibility.details.timeoutMs)} ms</code>.`} No complete component comparison was published.</p></div>`
 export const style = `body{margin:0;background:#15191e;color:#ecf0f4;font:16px/1.6 system-ui}main{max-width:1000px;margin:60px auto;padding:0 24px}h1{font-size:42px;line-height:1.15}h2{margin-top:40px}a{color:#73d2c5}p{max-width:850px}table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}td,th{text-align:left;padding:12px;border-bottom:1px solid #39434d}svg{width:100%;max-width:850px}small{color:#b0bac4}.scroll{overflow-x:auto}.badge{color:#73d2c5;text-transform:uppercase;letter-spacing:2px}code{overflow-wrap:anywhere}.failure{color:#ffbe85}`
-export function renderChart(groups) {
+export function renderChart(groups: Record<Implementation, ReportGroup>): string {
   const orderedGroups = sortGroups(groups)
-  const max = Math.max(1, ...Object.values(orderedGroups).filter((group) => group.loaded).map((group) => group.loaded.max))
+  const max = Math.max(1, ...Object.values(orderedGroups).filter((group) => group.loaded).map((group) => group.loaded!.max))
   return `<svg viewBox="0 0 800 ${Object.keys(orderedGroups).length * 85 + 20}" role="img" aria-label="Retained JavaScript heap medians and ranges in MiB; failed loads have no bar"><title>Loaded tree retained JavaScript heap; lower uses less</title>${Object.entries(orderedGroups).map(([key, group], i) => {
     const y = 35 + i * 85
-    const label = `<text x="0" y="${y + 22}" fill="currentColor" font-size="14">${labels[key]}</text>`
+    const implementation = key as Implementation
+    const label = `<text x="0" y="${y + 22}" fill="currentColor" font-size="14">${labels[implementation]}</text>`
     if (group.unavailable) return `${label}<text x="235" y="${y + 22}" fill="#ffbe85">Workload infeasible — no memory result</text>`
     if (group.failures) return `${label}<text x="235" y="${y + 22}" fill="#ffbe85">Load failed (${group.failures}/${group.repeats}) — no memory result</text>`
-    const x = (value) => 235 + value / max * 430
-    const fill = key === 'lvce' ? '#4db9aa' : '#c982de'
-    return `${label}<rect x="235" y="${y}" width="${x(group.loaded.median) - 235}" height="32" rx="3" fill="${fill}"/><path d="M${x(group.loaded.min)},${y + 16}H${x(group.loaded.max)}" stroke="white" stroke-width="3"/><text x="${x(group.loaded.median) + 12}" y="${y + 53}" fill="currentColor">${mib(group.loaded.median)} MiB</text>`
+    const x = (value: number): number => 235 + value / max * 430
+    const fill = implementation === 'lvce' ? '#4db9aa' : '#c982de'
+    return `${label}<rect x="235" y="${y}" width="${x(group.loaded!.median) - 235}" height="32" rx="3" fill="${fill}"/><path d="M${x(group.loaded!.min)},${y + 16}H${x(group.loaded!.max)}" stroke="white" stroke-width="3"/><text x="${x(group.loaded!.median) + 12}" y="${y + 53}" fill="currentColor">${mib(group.loaded!.median)} MiB</text>`
   }).join('')}</svg>`
 }
-export function renderTable(groups) {
-  const rows = Object.entries(sortGroups(groups)).map(([key, group]) => group.unavailable
-    ? `<tr><th>${labels[key]}</th><td colspan="4" class="failure">Workload infeasible: ${group.messages.map(escape).join('; ')}</td></tr>`
+export function renderTable(groups: Record<Implementation, ReportGroup>): string {
+  const rows = Object.entries(sortGroups(groups)).map(([key, group]) => {
+    const implementation = key as Implementation
+    return group.unavailable
+    ? `<tr><th>${labels[implementation]}</th><td colspan="4" class="failure">Workload infeasible: ${group.messages.map(escape).join('; ')}</td></tr>`
     : group.failures
-    ? `<tr><th>${labels[key]}</th><td colspan="4" class="failure">${group.failures}/${group.repeats} loads failed: ${group.messages.map(escape).join('; ')}</td></tr>`
-    : `<tr><th>${labels[key]}</th><td>${mib(group.empty.median)}</td><td>${mib(group.loaded.median)}</td><td>${mib(group.loaded.min)}–${mib(group.loaded.max)}</td><td>${mib(group.delta.median)}</td></tr>`).join('')
+    ? `<tr><th>${labels[implementation]}</th><td colspan="4" class="failure">${group.failures}/${group.repeats} loads failed: ${group.messages.map(escape).join('; ')}</td></tr>`
+    : `<tr><th>${labels[implementation]}</th><td>${mib(group.empty!.median)}</td><td>${mib(group.loaded!.median)}</td><td>${mib(group.loaded!.min)}–${mib(group.loaded!.max)}</td><td>${mib(group.delta!.median)}</td></tr>`
+  }).join('')
   return `<div class="scroll"><table><caption>MiB (1,048,576 bytes). Medians across independent trials; range of trial medians.</caption><thead><tr><th>Implementation</th><th>Empty</th><th>Loaded</th><th>Loaded range</th><th>Paired increase</th></tr></thead><tbody>${rows}</tbody></table></div>`
 }
-export async function buildReport(source = 'results', destination = '.tmp/pages') {
-  const report = JSON.parse(await readFile(`${source}/results.json`, 'utf8'))
+export async function buildReport(source = 'results', destination = '.tmp/pages'): Promise<{ report: BenchmarkReport; groups: Record<Implementation, ReportGroup> }> {
+  const report = JSON.parse(await readFile(`${source}/results.json`, 'utf8')) as BenchmarkReport
   const groups = aggregate(report)
   // Older reports used implicit screenshot names. Keep their existing downloads.
   for (const trial of report.trials) {
@@ -79,7 +85,7 @@ export async function buildReport(source = 'results', destination = '.tmp/pages'
     try {
       await access(`${source}/${name}`)
       trial.screenshots = { [phase]: name }
-    } catch (error) { if (error.code !== 'ENOENT') throw error }
+    } catch (error) { if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error }
   }
   await mkdir(destination, { recursive: true })
   await cp(source, `${destination}/evidence`, { recursive: true })
@@ -92,9 +98,9 @@ ${renderChart(groups)}${renderTable(groups)}<small>Increase = loaded minus empty
 <h2>What was measured</h2><p>A fresh browser per trial; empty mounted tree followed by the populated tree and scrolling probes. Identical local directory listing, 480×600 tree viewport and 22-pixel rows. Load action limit: ${(report.protocol.loadTimeoutMs ?? 90000) / 1000} seconds for every component; scrolling actions and visibility probes: 90 seconds. Natural pre-GC samples, per-isolate heap details, backing-store and embedder counters, DOM counts, screenshots and failures are retained as evidence. The chart uses only the explicitly named V8 usedSize counter.</p>
 <p>LVCE uses pinned upstream explorer state, commands, sorting, virtualization and virtual DOM, in a dedicated worker with a minimal host. Editor filesystem/preferences/icon RPCs are replaced with fixture services. Pierre uses its vanilla FileTree API with normal input preparation. React Arborist uses its React Tree and built-in virtualization. Headless Tree uses the core sync loader with a minimal, nonvirtualized vanilla DOM host. jsTree uses jQuery and its full DOM rendering with default worker parsing. All disable file icon themes and leave search and Git decorations unexercised. Full application bootstraps, desktop apps, filesystem server, disk cache, Playwright and observer memory are excluded. The adapter and each component's own runtime costs remain included. Default overscan differs and is preserved.</p>
 <p>This flat-directory workload makes all files logically visible but preserves built-in virtualization where available; the Headless Tree DOM host and jsTree render every row. It does not establish behavior for deep trees, collapsed folders, file contents, edits, selection, or other sizes. Forced GC estimates retained heap, not allocation peaks. LVCE maintains this benchmark; results do not predetermine a winner.</p>
-<h2>Provenance</h2>${report.shards ? `<p>Each implementation ran in a separate CI job. Per-job host metadata and original results are preserved in the JSON and <code>shards/</code> evidence directories.</p>` : ''}<p>Captured ${escape(report.date)} · Chromium ${escape(report.trials[0].chromium)} · ${escape(report.host.platform)} ${escape(report.host.arch)}<br>LVCE commit <code>${escape(report.sources.lvce.commit)}</code><br>${Object.entries(report.sources).filter(([, source]) => source.version).map(([id, source]) => `${escape(labels[id] ?? id)} ${escape(source.version)}`).join("<br>")}<br>Fixture SHA-256 <code>${escape(report.fixture.sha256)}</code><br>Dependency lock SHA-256 <code>${escape(report.packageLockSha256)}</code></p>
-<details><summary>Per-trial evidence</summary><ul>${report.trials.map((trial) => `<li>${labels[trial.implementation]} trial ${trial.repeat + 1}: ${trial.status === 'passed' ? `${mib(trial.phases.loaded.usedSize.median)} MiB · ${trial.phases.loaded.renderedRows} DOM rows` : `load failed: ${escape(trial.componentFailure.message)}`}${trial.screenshots?.[trial.status === 'passed' ? 'loaded' : 'failed'] ? ` · <a href="evidence/${escape(trial.screenshots[trial.status === 'passed' ? 'loaded' : 'failed'])}">screenshot</a>` : ' · screenshot unavailable'}</li>`).join('')}</ul></details></main></html>`
+<h2>Provenance</h2>${report.shards ? `<p>Each implementation ran in a separate CI job. Per-job host metadata and original results are preserved in the JSON and <code>shards/</code> evidence directories.</p>` : ''}<p>Captured ${escape(report.date)} · Chromium ${escape(report.trials[0]?.chromium)} · ${escape(report.host.platform)} ${escape(report.host.arch)}<br>LVCE commit <code>${escape(report.sources.lvce?.commit)}</code><br>${Object.entries(report.sources).filter(([, source]) => source.version).map(([id, source]) => `${escape(labels[id as Implementation] ?? id)} ${escape(source.version)}`).join("<br>")}<br>Fixture SHA-256 <code>${escape(report.fixture.sha256)}</code><br>Dependency lock SHA-256 <code>${escape(report.packageLockSha256)}</code></p>
+<details><summary>Per-trial evidence</summary><ul>${report.trials.map((trial) => `<li>${labels[trial.implementation]} trial ${trial.repeat + 1}: ${trial.status === 'passed' ? `${mib(trial.phases.loaded!.usedSize.median)} MiB · ${trial.phases.loaded!.renderedRows} DOM rows` : `load failed: ${escape(trial.componentFailure?.message)}`}${trial.screenshots?.[trial.status === 'passed' ? 'loaded' : 'failed'] ? ` · <a href="evidence/${escape(trial.screenshots[trial.status === 'passed' ? 'loaded' : 'failed'])}">screenshot</a>` : ' · screenshot unavailable'}</li>`).join('')}</ul></details></main></html>`
   await writeFile(`${destination}/index.html`, html)
   return { report, groups }
 }
-if (import.meta.url === pathToFileURL(process.argv[1]).href) await buildReport(process.argv[2], process.argv[3])
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) await buildReport(process.argv[2], process.argv[3])
