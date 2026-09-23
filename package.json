@@ -13,7 +13,7 @@
     "benchmark": "node packages/benchmark/src/run.ts",
     "report": "node packages/benchmark/src/report-all.ts",
     "merge": "node packages/benchmark/src/merge.ts",
-    "test": "node --test packages/benchmark/test/*.test.ts",
+    "test": "node --test packages/benchmark/test/core.test.ts packages/benchmark/test/merge.test.ts",
     "test:crash": "node --test packages/benchmark/test/crash.test.ts packages/benchmark/test/termination.test.ts",
     "serve": "node packages/benchmark/src/server.ts",
     "test:report": "node packages/benchmark/src/test-report.ts",
