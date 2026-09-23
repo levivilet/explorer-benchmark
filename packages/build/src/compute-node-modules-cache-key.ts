@@ -6,7 +6,7 @@ const locations = [
   'package.json',
   'package-lock.json',
   '.github/workflows/benchmark.yml',
-  'scripts/compute-node-modules-cache-key.ts',
+  'packages/build/src/compute-node-modules-cache-key.ts',
 ]
 
 const computeHash = (contents: string[]): string => {

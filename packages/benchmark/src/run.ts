@@ -22,7 +22,7 @@ let failed = false
 for (const workload of manifest.workloads) {
   const { count } = workload
   const timeoutMs = count >= 10_000_000 ? 15 * 60 * 1000 : undefined
-  const result = spawnSync(process.execPath, ['scripts/benchmark.ts', ...(values.implementation ? ['--implementation', values.implementation] : []), '--files', String(count), '--repeats', values.repeats, '--samples', values.samples, '--seed', values.seed, '--output', `${values.output}/${count}`], { stdio: 'inherit', timeout: timeoutMs })
+  const result = spawnSync(process.execPath, ['packages/benchmark/src/benchmark.ts', ...(values.implementation ? ['--implementation', values.implementation] : []), '--files', String(count), '--repeats', values.repeats, '--samples', values.samples, '--seed', values.seed, '--output', `${values.output}/${count}`], { stdio: 'inherit', timeout: timeoutMs })
   if (count >= 10_000_000 && result.error instanceof Error && 'code' in result.error && result.error.code === 'ETIMEDOUT') {
     const feasibility = {
       schemaVersion: 1,

@@ -1,19 +1,8 @@
 {
-  "compilerOptions": {
-    "target": "ES2024",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
-    "lib": ["ES2024", "DOM", "DOM.Iterable"],
-    "types": ["node"],
-    "strict": true,
-    "allowImportingTsExtensions": true,
-    "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
-    "skipLibCheck": true,
-    "noUncheckedIndexedAccess": true,
-    "resolveJsonModule": true,
-    "noEmit": true
-  },
-  "include": ["scripts/**/*.ts", "web/**/*.ts"],
-  "exclude": [".tmp", "dist", "node_modules"]
+  "files": [],
+  "references": [
+    { "path": "./packages/build" },
+    { "path": "./packages/trees" },
+    { "path": "./packages/benchmark" }
+  ]
 }
