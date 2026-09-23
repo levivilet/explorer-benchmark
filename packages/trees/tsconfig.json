@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2024",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    "strict": true,
+    "composite": true,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "rootDir": "src",
+    "outDir": "../../.tmp/types/trees",
+    "tsBuildInfoFile": "../../.tmp/types/trees.tsbuildinfo",
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "noUncheckedIndexedAccess": true,
+    "allowImportingTsExtensions": true
+  },
+  "include": ["src/**/*.ts"]
+}

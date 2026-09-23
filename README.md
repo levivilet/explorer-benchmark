@@ -21,6 +21,7 @@ nice npm ci
 npm run setup                    # Download and verify pinned LVCE source
 npm run build                    # Production bundles for all five components
 npx playwright install chromium  # Linux CI uses --with-deps
+npm run type-check               # TypeScript project-reference check
 npm test
 npm run test:cdp
 npm run test:adapters              # Repeated virtualized scrolling regression
@@ -36,11 +37,13 @@ On platforms without `nice`, use `npm ci`. The benchmark requires no GitHub toke
 root privileges, editor installation, or access to your existing workspaces.
 Setup writes only the JSON fixtures and manifests in `.tmp/fixtures-json`; it does not access existing workspaces or old `.tmp/fixtures` directories. Benchmark execution requires a completed setup and fails with preparation instructions if a fixture is missing.
 
+The npm workspaces keep build orchestration in `packages/build`, benchmark runners and tests in `packages/benchmark`, and browser tree adapters/assets in `packages/trees`. Root npm commands preserve the repository-root paths used for fixtures, downloaded sources, bundles and results.
+
 ```sh
 # Quick adapter/CDP smoke; explicitly labeled as too few trials for comparison:
 npm run fixture -- --files 1000
 npm run benchmark -- --files 1000 --repeats 1 --samples 1 --output results-smoke
-node scripts/report-all.ts results-smoke .tmp/smoke-pages
+node packages/benchmark/src/report-all.ts results-smoke .tmp/smoke-pages
 
 # Open the components manually after generating/building:
 npm run fixture -- --files 100000

@@ -3,10 +3,10 @@ import assert from 'node:assert/strict'
 import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { median, shuffle } from '../scripts/statistics.ts'
-import { createFixture, digestNames, fileName, fileNameWidth, loadFixture, positiveInteger } from '../scripts/fixture.ts'
-import { aggregate, renderChart, renderFeasibility, renderTable } from '../scripts/report.ts'
-import { startServer } from '../scripts/server.ts'
+import { median, shuffle } from '../src/statistics.ts'
+import { createFixture, digestNames, fileName, fileNameWidth, loadFixture, positiveInteger } from '../src/fixture.ts'
+import { aggregate, renderChart, renderFeasibility, renderTable } from '../src/report.ts'
+import { startServer } from '../src/server.ts'
 
 test('statistics keep negative deltas and reject missing measurements', () => {
   assert.equal(median([-10, 4, 1]), 1)
@@ -143,7 +143,7 @@ test('reports sort successful comparisons by loaded heap and keep failures last'
 })
 
 test('input parser capacity is distinguished from malformed data and HTTP failures', async (t) => {
-  const { readEntries } = await import('../web/read-entries.ts')
+  const { readEntries } = await import('@explorer-benchmark/trees/read-entries')
   const calls = []
   let failure
   let status = 200
@@ -166,7 +166,7 @@ test('input parser capacity is distinguished from malformed data and HTTP failur
 
 
 test('streaming fixture parser preserves all entries at every byte boundary', async () => {
-  const { parseEntries } = await import('../web/read-entries.ts')
+  const { parseEntries } = await import('@explorer-benchmark/trees/read-entries')
   const expected = Array.from({ length: 12 }, (_, i) => ({ name: fileName(i, 8), type: 7 }))
   const bytes = new TextEncoder().encode(JSON.stringify(expected))
   for (let split = 0; split <= bytes.length; split++) {

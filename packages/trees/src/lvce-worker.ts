@@ -2,11 +2,8 @@ import { readEntries } from './read-entries.ts'
 import type { Entry, LoadState } from './types.ts'
 // This host replaces editor services only. Tree algorithms and VDOM are unmodified upstream source.
 import { RendererWorker, IconThemeWorker } from '@lvce-editor/rpc-registry'
-// The downloaded LVCE source is intentionally kept outside the checked-in TypeScript project.
-// @ts-expect-error The source is materialized by `npm run setup` before browser bundling.
-import { commandMap } from '../.tmp/vendor/packages/explorer-view/src/parts/CommandMap/CommandMap.ts'
-// @ts-expect-error The source is materialized by `npm run setup` before browser bundling.
-import { getComponentState } from '../.tmp/vendor/packages/explorer-view/src/parts/GetComponentState/GetComponentState.ts'
+import { commandMap } from '@benchmark-vendor/explorer-command-map'
+import { getComponentState } from '@benchmark-vendor/explorer-component-state'
 let fixtureState: LoadState = 'empty'
 let hostFailure: Error | undefined
 ;(RendererWorker as any).set({ invoke: async (method: string, ...args: any[]) => {
