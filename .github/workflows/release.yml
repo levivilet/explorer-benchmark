@@ -1,0 +1,46 @@
+name: release
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: read
+
+jobs:
+  create-release:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Create draft GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: gh release create "$RELEASE_TAG" --verify-tag --title "$RELEASE_TAG" --draft
+
+  test:
+    needs: create-release
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm test
+
+  publish-release:
+    needs: [create-release, test]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: gh release edit "$RELEASE_TAG" --draft=false
