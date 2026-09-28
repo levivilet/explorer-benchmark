@@ -1,0 +1,8 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/build" },
+    { "path": "./packages/trees" },
+    { "path": "./packages/benchmark" }
+  ]
+}

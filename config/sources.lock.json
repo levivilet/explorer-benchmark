@@ -1,0 +1,28 @@
+{
+  "lvce": {
+    "repository": "https://github.com/lvce-editor/explorer-view",
+    "commit": "2d93b606d41130a55865b48f5c98abda5ceba760",
+    "url": "https://api.github.com/repos/lvce-editor/explorer-view/tarball/2d93b606d41130a55865b48f5c98abda5ceba760",
+    "sha256": "ef97aed702f085d8526050b106b55621744f5a479f2d9d3980960cf092c4bd20"
+  },
+  "pierre": {
+    "repository": "https://github.com/pierrecomputer/pierre",
+    "package": "@pierre/trees",
+    "version": "1.0.0-beta.6"
+  },
+  "arborist": {
+    "repository": "https://github.com/brimdata/react-arborist",
+    "package": "react-arborist",
+    "version": "3.16.0"
+  },
+  "headless": {
+    "repository": "https://github.com/lukasbach/headless-tree",
+    "package": "@headless-tree/core",
+    "version": "1.7.0"
+  },
+  "jstree": {
+    "repository": "https://github.com/vakata/jstree",
+    "package": "jstree",
+    "version": "3.3.17"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "@explorer-benchmark/build",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "@types/node": "24.13.3"
+  }
+}

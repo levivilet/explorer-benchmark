@@ -1,0 +1,33 @@
+{
+  "name": "@explorer-benchmark/trees",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./read-entries": "./src/read-entries.ts"
+  },
+  "dependencies": {
+    "@headless-tree/core": "1.7.0",
+    "@lvce-editor/assert": "1.9.0",
+    "@lvce-editor/constants": "5.30.0",
+    "@lvce-editor/i18n": "2.10.0",
+    "@lvce-editor/rpc": "6.19.3",
+    "@lvce-editor/rpc-registry": "9.63.1",
+    "@lvce-editor/verror": "1.7.0",
+    "@lvce-editor/virtual-dom": "11.19.0",
+    "@lvce-editor/virtual-dom-worker": "11.19.0",
+    "@lvce-editor/viewlet-registry": "5.12.0",
+    "@pierre/trees": "1.0.0-beta.6",
+    "jquery": "3.7.1",
+    "jstree": "3.3.17",
+    "react": "19.2.8",
+    "react-arborist": "3.16.0",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@types/jquery": "3.5.32",
+    "@types/jstree": "3.3.46",
+    "@types/react": "19.1.16",
+    "@types/react-dom": "19.1.9"
+  }
+}
