@@ -48,20 +48,20 @@ export function sortGroups(groups: Record<Implementation, ReportGroup>): Record<
 export const escape = (text: unknown): string => String(text).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char] ?? char)
 export const mib = (bytes: number): string => (bytes / 1048576).toFixed(2)
 export const renderFeasibility = (feasibility: Feasibility): string => `<div class="failure"><p><strong>${feasibility.files.toLocaleString('en-US')}-file workload was infeasible on the benchmark host.</strong> ${escape(feasibility.reason)}</p><p>${feasibility.details.availableInodes ? `Available filesystem inodes: <code>${escape(feasibility.details.availableInodes)}</code>; required: <code>${escape(feasibility.details.requiredInodes)}</code>.` : `The workload left partial results: <code>${escape(feasibility.details.partialResults)}</code>; timeout: <code>${escape(feasibility.details.timeoutMs)} ms</code>.`} No complete component comparison was published.</p></div>`
-export const style = `body{margin:0;background:#15191e;color:#ecf0f4;font:16px/1.6 system-ui}main{max-width:1000px;margin:60px auto;padding:0 24px}h1{font-size:42px;line-height:1.15}h2{margin-top:40px}a{color:#73d2c5}p{max-width:850px}table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}td,th{text-align:left;padding:12px;border-bottom:1px solid #39434d}svg{width:100%;max-width:850px}small{color:#b0bac4}.scroll{overflow-x:auto}.badge{color:#73d2c5;text-transform:uppercase;letter-spacing:2px}code{overflow-wrap:anywhere}.failure{color:#ffbe85}`
+export const style = `:root{color-scheme:light;font:16px/1.6 system-ui,sans-serif;color:#17212b;background:#f4f7fa}body{margin:0}main{max-width:1000px;margin:3rem auto;padding:0 1rem}h1{font-size:42px;line-height:1.15}h2{margin-top:2.5rem}a{color:#0759a5}p{max-width:850px}.badge{display:inline-block;padding:.25rem .65rem;border-radius:999px;background:#e8f1fa;color:#0759a5;text-transform:uppercase;letter-spacing:.08em;font-size:.8rem;font-weight:600}table{border-collapse:collapse;width:100%;margin:1.5rem 0;background:#fff;font-variant-numeric:tabular-nums}td,th{text-align:left;vertical-align:top;padding:.7rem;border-bottom:1px solid #d7e0e8}thead th{background:#e8f1fa}.scroll{overflow-x:auto}.chart-scroll{overflow-x:auto;background:#fff;border:1px solid #d7e0e8;border-radius:.5rem;margin:1.5rem 0;padding:.75rem}.chart{display:block;width:100%;min-width:760px;height:auto}small{color:#52616f}code{overflow-wrap:anywhere}.failure{padding:1rem;background:#fff4e5;border-left:4px solid #c46b12;color:#8f3d00}.failure p{margin:.5rem 0}.failure code{color:#672c00}`
 export function renderChart(groups: Record<Implementation, ReportGroup>): string {
   const orderedGroups = sortGroups(groups)
   const max = Math.max(1, ...Object.values(orderedGroups).filter((group) => group.loaded).map((group) => group.loaded!.max))
-  return `<svg viewBox="0 0 800 ${Object.keys(orderedGroups).length * 85 + 20}" role="img" aria-label="Retained JavaScript heap medians and ranges in MiB; failed loads have no bar"><title>Loaded tree retained JavaScript heap; lower uses less</title>${Object.entries(orderedGroups).map(([key, group], i) => {
+  return `<div class="chart-scroll"><svg class="chart" viewBox="0 0 800 ${Object.keys(orderedGroups).length * 85 + 20}" role="img" aria-label="Retained JavaScript heap medians and ranges in MiB; failed loads have no bar"><title>Loaded tree retained JavaScript heap; lower uses less</title>${Object.entries(orderedGroups).map(([key, group], i) => {
     const y = 35 + i * 85
     const implementation = key as Implementation
     const label = `<text x="0" y="${y + 22}" fill="currentColor" font-size="14">${labels[implementation]}</text>`
-    if (group.unavailable) return `${label}<text x="235" y="${y + 22}" fill="#ffbe85">Workload infeasible — no memory result</text>`
-    if (group.failures) return `${label}<text x="235" y="${y + 22}" fill="#ffbe85">Load failed (${group.failures}/${group.repeats}) — no memory result</text>`
+    if (group.unavailable) return `${label}<text x="235" y="${y + 22}" fill="#8f3d00">Workload infeasible — no memory result</text>`
+    if (group.failures) return `${label}<text x="235" y="${y + 22}" fill="#8f3d00">Load failed (${group.failures}/${group.repeats}) — no memory result</text>`
     const x = (value: number): number => 235 + value / max * 430
-    const fill = implementation === 'lvce' ? '#4db9aa' : '#c982de'
-    return `${label}<rect x="235" y="${y}" width="${x(group.loaded!.median) - 235}" height="32" rx="3" fill="${fill}"/><path d="M${x(group.loaded!.min)},${y + 16}H${x(group.loaded!.max)}" stroke="white" stroke-width="3"/><text x="${x(group.loaded!.median) + 12}" y="${y + 53}" fill="currentColor">${mib(group.loaded!.median)} MiB</text>`
-  }).join('')}</svg>`
+    const fill = implementation === 'lvce' ? '#07836f' : '#86509e'
+    return `${label}<rect x="235" y="${y}" width="${x(group.loaded!.median) - 235}" height="32" rx="3" fill="${fill}"/><path d="M${x(group.loaded!.min)},${y + 16}H${x(group.loaded!.max)}" stroke="#4780ad" stroke-width="3"/><text x="${x(group.loaded!.median) + 12}" y="${y + 53}" fill="currentColor">${mib(group.loaded!.median)} MiB</text>`
+  }).join('')}</svg></div>`
 }
 export function renderTable(groups: Record<Implementation, ReportGroup>): string {
   const rows = Object.entries(sortGroups(groups)).map(([key, group]) => {

@@ -16,7 +16,23 @@ try {
   }
   assert((await page.getByRole('img').count()) >= 1)
   assert((await page.getByRole('link', { name: 'Download raw measurements (JSON)' }).count()) >= 1)
+  assert.equal(await page.locator('html').evaluate((element) => getComputedStyle(element).backgroundColor), 'rgb(244, 247, 250)')
+  const chartContainer = page.locator('.chart-scroll').first()
+  assert.equal(await chartContainer.evaluate((element) => getComputedStyle(element).backgroundColor), 'rgb(255, 255, 255)')
+  assert.equal(await page.locator('svg path').first().evaluate((element) => getComputedStyle(element).stroke), 'rgb(71, 128, 173)')
+  const failureStyle = await page.evaluate(() => {
+    const element = document.createElement('div')
+    element.className = 'failure'
+    document.body.append(element)
+    const { color, backgroundColor } = getComputedStyle(element)
+    element.remove()
+    return { color, backgroundColor }
+  })
+  assert.deepEqual(failureStyle, { color: 'rgb(143, 61, 0)', backgroundColor: 'rgb(255, 244, 229)' })
   assert(!await page.locator('body').innerText().then((text) => /NaN|undefined/.test(text)))
   await page.screenshot({ path: '.tmp/pages/report.png', fullPage: true })
+  await page.setViewportSize({ width: 390, height: 844 })
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390)
+  assert(await chartContainer.evaluate((element) => element.scrollWidth > element.clientWidth))
   assert.deepEqual(errors, [])
 } finally { await browser.close() }
