@@ -54,13 +54,14 @@ export function renderChart(groups: Record<Implementation, ReportGroup>): string
   const max = Math.max(1, ...Object.values(orderedGroups).filter((group) => group.loaded).map((group) => group.loaded!.max))
   return `<div class="chart-scroll"><svg class="chart" viewBox="0 0 800 ${Object.keys(orderedGroups).length * 85 + 20}" role="img" aria-label="Retained JavaScript heap medians and ranges in MiB; failed loads have no bar"><title>Loaded tree retained JavaScript heap; lower uses less</title>${Object.entries(orderedGroups).map(([key, group], i) => {
     const y = 35 + i * 85
+    const rowCenter = y + 16
     const implementation = key as Implementation
-    const label = `<text x="0" y="${y + 22}" fill="currentColor" font-size="14">${labels[implementation]}</text>`
-    if (group.unavailable) return `${label}<text x="235" y="${y + 22}" fill="#8f3d00">Workload infeasible — no memory result</text>`
-    if (group.failures) return `${label}<text x="235" y="${y + 22}" fill="#8f3d00">Load failed (${group.failures}/${group.repeats}) — no memory result</text>`
+    const label = `<text x="4" y="${rowCenter}" dominant-baseline="middle" fill="currentColor" font-size="14">${labels[implementation]}</text>`
+    if (group.unavailable) return `${label}<text x="235" y="${rowCenter}" dominant-baseline="middle" fill="#8f3d00">Workload infeasible — no memory result</text>`
+    if (group.failures) return `${label}<text x="235" y="${rowCenter}" dominant-baseline="middle" fill="#8f3d00">Load failed (${group.failures}/${group.repeats}) — no memory result</text>`
     const x = (value: number): number => 235 + value / max * 430
     const fill = implementation === 'lvce' ? '#07836f' : '#86509e'
-    return `${label}<rect x="235" y="${y}" width="${x(group.loaded!.median) - 235}" height="32" rx="3" fill="${fill}"/><path d="M${x(group.loaded!.min)},${y + 16}H${x(group.loaded!.max)}" stroke="#4780ad" stroke-width="3"/><text x="${x(group.loaded!.median) + 12}" y="${y + 53}" fill="currentColor">${mib(group.loaded!.median)} MiB</text>`
+    return `${label}<rect x="235" y="${y}" width="${x(group.loaded!.median) - 235}" height="32" rx="3" fill="${fill}"/><path d="M${x(group.loaded!.min)},${rowCenter}H${x(group.loaded!.max)}" stroke="#4780ad" stroke-width="3"/><text x="${x(group.loaded!.median) + 12}" y="${rowCenter}" dominant-baseline="middle" fill="currentColor">${mib(group.loaded!.median)} MiB</text>`
   }).join('')}</svg></div>`
 }
 export function renderTable(groups: Record<Implementation, ReportGroup>): string {

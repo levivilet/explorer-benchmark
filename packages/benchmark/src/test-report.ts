@@ -12,7 +12,22 @@ try {
   assert((await page.locator('tbody tr').count()) >= 5)
   for (const name of ['React Arborist', 'Headless Tree (DOM host)', 'jsTree']) assert(await page.getByRole('rowheader', { name, exact: true }).count() >= 1)
   for (const chart of await page.getByRole('img').all()) {
-    assert(await chart.evaluate((svg) => [...svg.querySelectorAll('text')].every((text) => { const box = text.getBBox(); return box.y + box.height <= (svg as SVGSVGElement).viewBox.baseVal.height })))
+    assert(await chart.evaluate((svg) => {
+      const viewBox = (svg as SVGSVGElement).viewBox.baseVal
+      const texts = [...svg.querySelectorAll('text')]
+      const contained = texts.every((text) => {
+        const box = text.getBBox()
+        return box.x >= viewBox.x && box.y >= viewBox.y && box.x + box.width <= viewBox.x + viewBox.width && box.y + box.height <= viewBox.y + viewBox.height
+      })
+      const aligned = [...svg.querySelectorAll('rect')].every((bar) => {
+        const value = bar.nextElementSibling?.nextElementSibling
+        if (!(value instanceof SVGTextElement)) return false
+        const barBox = bar.getBBox()
+        const valueBox = value.getBBox()
+        return Math.abs((barBox.y + barBox.height / 2) - (valueBox.y + valueBox.height / 2)) <= 1
+      })
+      return contained && aligned
+    }))
   }
   assert((await page.getByRole('img').count()) >= 1)
   assert((await page.getByRole('link', { name: 'Download raw measurements (JSON)' }).count()) >= 1)
