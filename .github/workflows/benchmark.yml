@@ -29,7 +29,6 @@ jobs:
           path: node_modules
           key: ${{ runner.os }}-${{ runner.arch }}-node-modules-${{ steps.node-modules-cache-key.outputs.value }}
       - run: npm ci
-        if: steps.node-modules-cache.outputs.cache-hit != 'true'
       - run: npm run type-check
       - run: npm test
       - run: npm run setup
@@ -63,7 +62,6 @@ jobs:
           path: node_modules
           key: ${{ runner.os }}-${{ runner.arch }}-node-modules-${{ steps.node-modules-cache-key.outputs.value }}
       - run: npm ci
-        if: steps.node-modules-cache.outputs.cache-hit != 'true'
       - run: npm run setup
       - run: npm run build
       - run: npx playwright install --with-deps chromium
@@ -102,7 +100,6 @@ jobs:
           path: node_modules
           key: ${{ runner.os }}-${{ runner.arch }}-node-modules-${{ steps.node-modules-cache-key.outputs.value }}
       - run: npm ci
-        if: steps.node-modules-cache.outputs.cache-hit != 'true'
       - uses: actions/download-artifact@v8
         with:
           pattern: explorer-shard-*
