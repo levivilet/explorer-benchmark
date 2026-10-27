@@ -14,8 +14,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version-file: '.nvmrc'
           cache: npm
@@ -48,8 +48,8 @@ jobs:
         implementation: [lvce, pierre, arborist, headless, jstree]
         files: [10000, 100000, 1000000, 10000000, 100000000]
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version-file: '.nvmrc'
           cache: npm
@@ -74,7 +74,7 @@ jobs:
           BENCHMARK_COMMIT: ${{ github.sha }}
           BENCHMARK_RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: npm run benchmark -- --implementation ${{ matrix.implementation }} --files ${{ matrix.files }}
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: explorer-shard-${{ matrix.implementation }}-${{ matrix.files }}
@@ -87,8 +87,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version-file: '.nvmrc'
           cache: npm
@@ -103,7 +103,7 @@ jobs:
           key: ${{ runner.os }}-${{ runner.arch }}-node-modules-${{ steps.node-modules-cache-key.outputs.value }}
       - run: npm ci
         if: steps.node-modules-cache.outputs.cache-hit != 'true'
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v8
         with:
           pattern: explorer-shard-*
           path: shards
@@ -111,7 +111,7 @@ jobs:
       - run: npm run report
       - run: npx playwright install --with-deps chromium
       - run: npm run test:report
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: explorer-benchmark-${{ github.run_id }}
@@ -123,7 +123,7 @@ jobs:
       - name: Require all validation and benchmark jobs
         if: needs.test.result != 'success' || needs.benchmark.result != 'success'
         run: exit 1
-      - uses: actions/upload-pages-artifact@v4
+      - uses: actions/upload-pages-artifact@v5
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         with:
           path: .tmp/pages
@@ -138,6 +138,6 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/configure-pages@v5
-      - uses: actions/deploy-pages@v4
+      - uses: actions/configure-pages@v6
+      - uses: actions/deploy-pages@v5
         id: deployment
