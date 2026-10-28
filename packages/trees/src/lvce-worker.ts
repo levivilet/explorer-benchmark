@@ -12,6 +12,8 @@ let hostFailure: Error | undefined
     case 'Preferences.get': return args[0] === 'files.exclude' ? {} : false
     case 'Workspace.getUri': return '/workspace'
     case 'FileSystem.isReadonly': return true
+    // The benchmark fixture is static; upstream treats unsupported Git ignore watching as optional.
+    case 'FileWatcher.watchGitIgnore': return
     case 'FileSystem.readDirWithFileTypes': {
       if (args[0] !== '/workspace') throw new Error(`Unexpected directory ${args[0]}`)
       return await readEntries(fixtureState)

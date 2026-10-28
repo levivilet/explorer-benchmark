@@ -167,6 +167,9 @@ listed in each report. New runs record their implementation inventory, while his
 two-component reports remain readable. Every component gets the same five fresh trials
 at each default size, including first/middle/last DOM probes.
 
+jsTree 3.3.17 declares a jQuery `^3.5.0` peer dependency, so its adapter stays on the
+latest compatible jQuery 3 release until jsTree supports jQuery 4.
+
 A wide, flat directory is a stress case. Results do not generalize to deep trees,
 collapsed/lazy subdirectories, searches, mutations, file contents, or other sizes.
 Scrolling probes establish visibility and basic usability, not input latency.
