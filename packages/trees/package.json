@@ -18,7 +18,7 @@
     "@lvce-editor/virtual-dom": "11.25.0",
     "@lvce-editor/virtual-dom-worker": "11.25.0",
     "@pierre/trees": "1.0.0-beta.6",
-    "jquery": "4.0.0",
+    "jquery": "3.7.1",
     "jstree": "3.3.17",
     "react": "19.3.1",
     "react-arborist": "4.0.1",
